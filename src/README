@@ -1,44 +1,116 @@
-What's eating the battery life of my laptop? Why isn't it many more
-hours? Which software component causes the most power to be burned?
-These are important questions without a good answer... until now.
+﻿Building & Installing PowerTOP
+------------------------------
 
-The Linux 2.6.21 kernel introduces the so called tickless-idle
-feature. This feature allows the processor to be really idle for long
-periods of time, rather than having to wake up every millisecond for
-the timer tick. Current processors save a lot of power if they are
-idle for long periods, which translates into a longer battery life for
-your laptop, or a lower energy bill for your datacenter. However, a
-Linux system consists of more software than just the kernel, and there
-are many tunables involved. It's not easy to see what is going on, and
-as a result the behavior is sometimes far from optimal, and a lot of
-power is wasted.
+To build and install PowerTOP type the following commands, 
+	./configure 
+	./make
+	./make install
 
-Intel is proud to announce the PowerTOP tool
-(http://www.linuxpowertop.org), a program that collects the various
-pieces of information from your system and presents an overview of how
-well your laptop is doing in terms of power savings. In addition,
-PowerTOP will provide an indication of which tunables and software
-components are the biggest offenders in slurping up your battery time.
-PowerTOP will update it's display frequently so that you can directly
-see the impact of any changes you are making.
+Note: For Android (running Intel Architecture ) there is a Android.mk 
+that was provided by community members, and at this time is supported
+ mostly by community members. 
 
-A typical Linux distribution has many components that wake the
-processor up frequently for no good reason. In our testing with
-PowerTOP, we have seen many cases where with some simple fixes, the
-battery life of typical laptops was increased by one hour or more!
+Build dependencies
+------------------
 
-We are providing fixes for several of the issues we identified, and we
-encourage the Linux community to help us in this quest to get the
-maximum battery life out of your (hopefully Intel based) laptops. Try
-the PowerTOP tool, join the mailing list or the IRC channel and
-provide feedback, problem reports or fixes!
+PowerTOP uses C++, and expects g++ and libstdc++ to be functional 
+along with a glibc/pthreadsi, autoconf, automake, and libtool in the 
+development environment.
+ 
 
-Website:      http://www.linuxpowertop.org
-IRC:          irc.oftc.net    #powertop channel
-Mailing list: http://www.bughost.org/mailman/listinfo/power
-Tags: intel, linux
+in addition to that, PowerTOP requires the following components:
+
+pciutils-devel (is only required if you have PCI) 
+ncurses-devel  (required) 
+libnl-devel    (required)
+kernel version => 2.6.38
+
+Kernel Parameters:
+------------------
+
+PowerTOP needs some kernel config options enabled in order function properly.
+As of linux-3.3.0 these are (list probably incomplete):
+
+CONFIG_NO_HZ
+CONFIG_HIGH_RES_TIMERS
+CONFIG_HPET_TIMER
+CONFIG_CPU_FREQ_GOV_ONDEMAND
+CONFIG_USB_SUSPEND
+CONFIG_SND_AC97_POWER_SAVE
+CONFIG_TIMER_STATS
+CONFIG_PERF_EVENTS
+CONFIG_PERF_COUNTERS
+CONFIG_TRACEPOINTS
+CONFIG_TRACING
+CONFIG_EVENT_POWER_TRACING_DEPRECATED
+ACPI_PROCFS_POWER
+
+The patches in the patches/ sub-directory are required for PowerTOP to function
+fully.
 
 
 
-If you have bugreports or patches, I prefer that you use the mailing list
-but you can email me directly at arjan@linux.intel.com.
+Outputting a report
+-------------------
+When invoking PowerTOP without arguments, PowerTOP starts in interactive mode.
+However, for reporting bugs etc there is a special reporting modes:
+
+For an HTML formatted report simply execute PowerTOP with the following,  
+
+powertop --html
+
+which will create a "powertop.html" file which is static and can be sent to
+others to help diagnose power issues. Additionally has the feature of showing 
+the tunables executions withing the report as a reference. 
+
+Note for the developers: If you make changes on the report format please
+make sure that the output can be cleanly validated by the W3C Markup
+Validation Service and W3C CSS Validation Service:
+ * http://validator.w3.org/#validate_by_upload
+ * http://jigsaw.w3.org/css-validator/#validate_by_upload
+
+For a CSV formatted report, simply execute PowerTOP with the following, 
+
+Powertop --csv 
+
+which will create a “powertop.csv” file which is static and can be used in 
+reporting, diagnoses, and analytical data analysis. 
+
+Also you can set the number of iterations, and duration of test, in which case 
+all reports will time stamp for you. 
+
+Calibrating & Power Numbers
+---------------------------
+PowerTOP will, when running on battery, track your power consumption as well
+as your activity on the system. Once there are sufficient such measurements,
+PowerTOP can start to report power estimates for various activities.
+You can help get this estimation more accurate by running a calibration
+cycle:
+
+powertop --calibrate
+
+at least once; this will cycle through various display brightness levels
+(including "off") as well as USB device activities and some other workloads.
+
+
+Code from other open source projects
+------------------------------------
+PowerTOP contains some code from other open source projects; we'd like to
+thank the authors of those projects for their work. 
+Specifically PowerTOP contains code from
+
+Parse Event Library - Copyright 2009, 2010 Red Hat Inc  Steven Rosted <srostedt@redhat.com>
+nl80211 userspace tool - Copyright 2007, 2008	Johannes Berg <johannes@sipsolutions.net>
+
+
+Extech Power Analyzer / Datalogger support
+------------------------------------------
+I use, and our analysis teams use, the Extech Power Analyzer/Datalogger
+(model number 380803) quite a lot, and PowerTOP supports using this
+device over the serial cable. Just pass the device node on the command line
+like this
+
+powertop --extech=/dev/ttyUSB0
+
+(where ttyUSB0 is the devicenode of the serial-to-usb adapter on my system)
+

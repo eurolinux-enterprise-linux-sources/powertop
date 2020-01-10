@@ -1,29 +1,26 @@
-Name:          powertop
-Version:       1.11
-Release:       6%{?dist}
-Summary:       Power consumption monitor
+Name:           powertop
+Version:        2.3
+Release:        3%{?dist}
+Summary:        Power consumption monitor
 
-Group:         Applications/System
-License:       GPLv2
-URL:           http://www.lesswatts.org/
-Source0:       http://www.lesswatts.org/projects/%{name}/download/%{name}-%{version}.tar.gz
-BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+Group:          Applications/System
+License:        GPLv2
+URL:            http://01.org/powertop/
+Source0:        http://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
 
-BuildRequires: gettext
-BuildRequires: ncurses-devel
-
-# Use strncpy to avoid stack smash, patch from Till Maas (#246796).
-Patch1: powertop-1.7-strncpy.patch
-# Backport of turbo detection (#610464).
-Patch2: powertop-1.11-turbo.patch
-# Show all P-states in dump mode (accepted by upstream).
-Patch3: powertop-1.11-dump-all-pstates.patch
-# Backport of tty handling for non-interactive mode (#628514).
-Patch4: powertop-1.11-notty.patch
-# Output error in interactive mode if there is no tty (posted upstream).
-Patch5: powertop-1.11-checktty.patch
-# Fix for sigwinch handling (#698422)
-Patch6: powertop-1.11-sigwinch.patch
+# Sent upstream
+Patch0:         powertop-2.3-always-create-params.patch
+# Sent upstream (http://github.com/fenrus75/powertop/pull/11)
+Patch1:         powertop-2.3-man-fix.patch
+# Sent upstream (http://github.com/fenrus75/powertop/pull/12)
+Patch2:         powertop-2.3-ondemand-check.patch
+# Accepted upstream
+Patch3:         powertop-2.4-unlimit-fds.patch
+# Sent upstream
+Patch4:         powertop-2.4-fd-limit-err.patch
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRequires:  gettext, ncurses-devel, pciutils-devel, zlib-devel, libnl-devel
+Requires(post): coreutils
 
 %description
 PowerTOP is a tool that finds the software component(s) that make your
@@ -31,32 +28,56 @@ computer use more power than necessary while it is idle.
 
 %prep
 %setup -q
-%patch1 -p1 -b .strncpy
-%patch2 -p1 -b .turbo
-%patch3 -p1 -b .show-all-stats-in-dump
-%patch4 -p1 -b .notty.patch
-%patch5 -p1 -b .checktty
-%patch6 -p1 -b .sigwinch.patch
+%patch0 -p1 -b .always-create-params
+%patch1 -p1 -b .man-fix
+%patch2 -p1 -b .ondemand-check
+%patch3 -p1 -b .unlimit-fds
+%patch4 -p1 -b .fd-limit-err
+
+# remove left over object files
+find . -name "*.o" -exec rm {} \;
 
 %build
-export CFLAGS="$RPM_OPT_FLAGS"
-make %{?_smp_mflags}
+%configure
+make %{?_smp_mflags} CFLAGS="%{optflags}"
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+rm -rf %{buildroot}
+make install DESTDIR=%{buildroot}
+install -Dd %{buildroot}%{_localstatedir}/cache/powertop
+touch %{buildroot}%{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop}
 %find_lang %{name}
 
+%post
+# Hack for powertop not to show warnings on first start
+touch %{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop}
+
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf %{buildroot}
 
 %files -f %{name}.lang
 %defattr(-,root,root,-)
-%doc COPYING README
-%{_bindir}/powertop
-%{_mandir}/man1/powertop.1*
+%doc COPYING README TODO
+%dir %{_localstatedir}/cache/powertop
+%ghost %{_localstatedir}/cache/powertop/saved_parameters.powertop
+%ghost %{_localstatedir}/cache/powertop/saved_results.powertop
+%{_sbindir}/powertop
+%{_mandir}/man8/powertop.8*
 
 %changelog
+* Tue Oct  8 2013 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-3
+- New version of unlimit-fds patch
+- Fixed error message if FDs limit is reached (by fd-limit-err patch)
+  Related: rhbz#998021
+
+* Mon Sep 23 2013 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-2
+- Unlimit FDs (by unlimit-fds patch)
+  Resolves: rhbz#998021
+
+* Wed Jul  3 2013 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-1
+- New version
+  Resolves: rhbz#829800, rhbz#682378, rhbz#697273
+
 * Tue Aug 16 2011 Jaroslav Škarvada <jskarvad@redhat.com> - 1.11-6
 - Improved sigwinch handling
   Resolves: rhbz#698422

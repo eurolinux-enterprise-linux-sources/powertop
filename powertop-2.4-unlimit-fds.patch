@@ -1,0 +1,65 @@
+diff --git a/src/main.cpp b/src/main.cpp
+index 0883424..16b1613 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -28,6 +28,7 @@
+  *	Arjan van de Ven <arjan@linux.intel.com>
+  */
+ #include <iostream>
++#include <fstream>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <time.h>
+@@ -36,6 +37,7 @@
+ #include <getopt.h>
+ #include <unistd.h>
+ #include <locale.h>
++#include <sys/resource.h>
+ 
+ #include "cpu/cpu.h"
+ #include "process/process.h"
+@@ -60,6 +62,8 @@
+ 
+ #define DEBUGFS_MAGIC          0x64626720
+ 
++#define NR_OPEN_DEF 1024 * 1024
++
+ int debug_learning = 0;
+ unsigned time_out = 20;
+ int leave_powertop = 0;
+@@ -278,16 +282,35 @@ static void checkroot() {
+ 
+ }
+ 
++static int get_nr_open(void) {
++	int nr_open = NR_OPEN_DEF;
++	ifstream file;
++
++	file.open("/proc/sys/fs/nr_open", ios::in);
++	if (file) {
++		file >> nr_open;
++		if (!file)
++			nr_open = NR_OPEN_DEF;
++		file.close();
++	}
++	return nr_open;
++}
++
+ static void powertop_init(void)
+ {
+ 	static char initialized = 0;
+ 	int ret;
+ 	struct statfs st_fs;
++	struct rlimit rlmt;
+ 
+ 	if (initialized)
+ 		return;
+ 
+ 	checkroot();
++
++	rlmt.rlim_cur = rlmt.rlim_max = get_nr_open();
++	setrlimit (RLIMIT_NOFILE, &rlmt);
++
+ 	ret = system("/sbin/modprobe cpufreq_stats > /dev/null 2>&1");
+ 	ret = system("/sbin/modprobe msr > /dev/null 2>&1");
+ 	statfs("/sys/kernel/debug", &st_fs);
