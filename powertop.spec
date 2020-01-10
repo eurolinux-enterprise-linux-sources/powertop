@@ -1,6 +1,6 @@
 Name:          powertop
 Version:       1.11
-Release:       4%{?dist}
+Release:       6%{?dist}
 Summary:       Power consumption monitor
 
 Group:         Applications/System
@@ -22,6 +22,8 @@ Patch3: powertop-1.11-dump-all-pstates.patch
 Patch4: powertop-1.11-notty.patch
 # Output error in interactive mode if there is no tty (posted upstream).
 Patch5: powertop-1.11-checktty.patch
+# Fix for sigwinch handling (#698422)
+Patch6: powertop-1.11-sigwinch.patch
 
 %description
 PowerTOP is a tool that finds the software component(s) that make your
@@ -34,6 +36,7 @@ computer use more power than necessary while it is idle.
 %patch3 -p1 -b .show-all-stats-in-dump
 %patch4 -p1 -b .notty.patch
 %patch5 -p1 -b .checktty
+%patch6 -p1 -b .sigwinch.patch
 
 %build
 export CFLAGS="$RPM_OPT_FLAGS"
@@ -54,6 +57,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man1/powertop.1*
 
 %changelog
+* Tue Aug 16 2011 Jaroslav Škarvada <jskarvad@redhat.com> - 1.11-6
+- Improved sigwinch handling
+  Resolves: rhbz#698422
+
+  * Tue Aug 02 2011 Jaroslav Škarvada <jskarvad@redhat.com> - 1.11-5
+- Fixed sigwinch handling
+  Resolves: rhbz#698422
+
 * Fri Dec 03 2010 Jaroslav Škarvada <jskarvad@redhat.com> - 1.11-4
 - Backported turbo detection (turbo patch, #610464)
 - Show all P-states in dump mode (dump-all-pstates patch, accepted by upstream)
