@@ -1,0 +1,31 @@
+--- powertop-1.11/powertop.c	2010-08-31 15:09:16.933820058 +0200
++++ powertop-1.11/powertop.c.checktty	2010-08-31 15:09:57.966244140 +0200
+@@ -23,6 +23,7 @@ 
+  */
+ 
+ #include <getopt.h>
++#include <termios.h>
+ #include <unistd.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -782,6 +783,7 @@ int main(int argc, char **argv)
+ 	FILE *file = NULL;
+ 	uint64_t cur_usage[8], cur_duration[8];
+ 	double wakeups_per_second = 0;
++	struct termios tmp_tty;
+ 
+ 	setlocale (LC_ALL, "");
+ 	bindtextdomain ("powertop", "/usr/share/locale");
+@@ -839,6 +841,12 @@ int main(int argc, char **argv)
+ 	printf("PowerTOP " VERSION "   (C) 2007, 2008 Intel Corporation \n\n");
+ 	if (geteuid() != 0)
+ 		printf(_("PowerTOP needs to be run as root to collect enough information\n"));
++
++	if (!dump && tcgetattr(STDIN_FILENO, &tmp_tty) == -1) {
++		printf(_("No valid input tty for interactive mode, aborting.\n"));
++		exit(1);
++	}
++
+ 	printf(_("Collecting data for %i seconds \n"), (int)ticktime);
+ 	printf("\n\n");
+ 	print_intel_cstates();

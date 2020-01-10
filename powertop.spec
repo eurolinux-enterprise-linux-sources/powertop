@@ -1,18 +1,27 @@
-Name:           powertop
-Version:        1.11
-Release:        3.1%{?dist}
-Summary:        Power consumption monitor
+Name:          powertop
+Version:       1.11
+Release:       4%{?dist}
+Summary:       Power consumption monitor
 
-Group:          Applications/System
-License:        GPLv2
-URL:            http://www.lesswatts.org/
-Source0:	http://www.lesswatts.org/projects/%{name}/download/%{name}-%{version}.tar.gz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+Group:         Applications/System
+License:       GPLv2
+URL:           http://www.lesswatts.org/
+Source0:       http://www.lesswatts.org/projects/%{name}/download/%{name}-%{version}.tar.gz
+BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires: gettext
 BuildRequires: ncurses-devel
 
+# Use strncpy to avoid stack smash, patch from Till Maas (#246796).
 Patch1: powertop-1.7-strncpy.patch
+# Backport of turbo detection (#610464).
+Patch2: powertop-1.11-turbo.patch
+# Show all P-states in dump mode (accepted by upstream).
+Patch3: powertop-1.11-dump-all-pstates.patch
+# Backport of tty handling for non-interactive mode (#628514).
+Patch4: powertop-1.11-notty.patch
+# Output error in interactive mode if there is no tty (posted upstream).
+Patch5: powertop-1.11-checktty.patch
 
 %description
 PowerTOP is a tool that finds the software component(s) that make your
@@ -21,6 +30,10 @@ computer use more power than necessary while it is idle.
 %prep
 %setup -q
 %patch1 -p1 -b .strncpy
+%patch2 -p1 -b .turbo
+%patch3 -p1 -b .show-all-stats-in-dump
+%patch4 -p1 -b .notty.patch
+%patch5 -p1 -b .checktty
 
 %build
 export CFLAGS="$RPM_OPT_FLAGS"
@@ -41,6 +54,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man1/powertop.1*
 
 %changelog
+* Fri Dec 03 2010 Jaroslav Škarvada <jskarvad@redhat.com> - 1.11-4
+- Backported turbo detection (turbo patch, #610464)
+- Show all P-states in dump mode (dump-all-pstates patch, accepted by upstream)
+- Backported tty handling for non-interactive mode (notty patch, #628514)
+- Output error in interactive mode if there is no tty (checktty patch,
+  posted upstream)
+- Fixed rpmlint warning about mixed tabs and spaces
+
 * Mon Nov 30 2009 Dennis Gregorovic <dgregor@redhat.com> - 1.11-3.1
 - Rebuilt for RHEL 6
 
