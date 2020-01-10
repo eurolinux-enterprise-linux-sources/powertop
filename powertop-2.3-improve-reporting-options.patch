@@ -1,0 +1,625 @@
+diff --git a/doc/powertop.8 b/doc/powertop.8
+index 4a2f0b0..b09cd4a 100644
+--- a/doc/powertop.8
++++ b/doc/powertop.8
+@@ -22,40 +22,44 @@ can get more accurate estimates by using this option to enable a
+ calibration cycle. This will cycle through various display levels and USB
+ device activities and workloads.
+ .TP
+-\fB\-\-csv[\fR=\fIFILENAME\fR]
++.BR \-C "[\fIFILENAME\fR], " \-\-csv [ =\fIFILENAME\fR]
+ generate a CSV report. If a filename is not specified then the
+-default name "powertop.csv" is used. The CSV report can be
+-used for reporting and data analysis.
++default name "powertop.csv" is used. If filename is "\fB\-\fR" then STDOUT is used.
++The CSV report can be used for reporting and data analysis.
+ .TP
+-\fB\-\-debug
++.BR \-d "[\fIFILENAME\fR], " \-\-dump [ =\fIFILENAME\fR]
++generate a plain text report. If a filename is not specified or it is "\fB\-\fR" then
++STDOUT is used.
++.TP
++\fB\-\-debug\fR
+  run in "debug" mode.
+ .TP
+-\fB\-\-extech\fR=\fIdevnode\fR
++.BI \-\-extech= devnode\fR
+ use the Extech Power Analyzer for measurements. This allows one to
+ specify the serial device node of the serial to USB adaptor connecting to
+ the Extech Power Analyzer, for example /dev/ttyUSB0.
+ .TP
+-\fB\-\-help
++\fB\-\-help\fR
+  show the help message.
+ .TP
+-\fB\-\-html[\fR=\fIFILENAME\fR]
++.BR \-r "[\fIFILENAME\fR], " \-\-html [ =\fIFILENAME\fR]
+ generate an HTML report. If a filename is not specified then the
+-default name "powertop.html" is used. The HTML report can be
+-sent to others to help diagnose power issues.
++default name "powertop.html" is used. If filename is "\fB\-\fR" then STDOUT is used.
++The HTML report can be sent to others to help diagnose power issues.
+ .TP
+-\fB\-\-iteration[\fR=\fIiterations\fR]
++.BR \-\-iteration [ =\fIiterations\fR]
+ number of times to run each test.
+ .TP
+-\fB\-\-workload[\fR=\fIworkload\fR]
++.BR \-\-workload [ =\fIworkload\fR]
+ file to execute for workload.
+ .TP
+-\fB\-\-quiet
++\fB\-\-quiet\fR
+  supress stderr output.
+ .TP
+-\fB\-\-time[\fR=\fIseconds\fR]
++.BR \-\-time [ =\fIseconds\fR]
+ generate a report for a specified number of seconds.
+ .TP
+-\fB\-\-version
++\fB\-\-version\fR
+ print version information and exit.
+ .SH BUGS
+ Send bug reports to <powertop@lists.01.org>
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 398b8a7..5807a2d 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -31,6 +31,7 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
+ 		report/report-formatter-base.cpp report/report-formatter-base.h \
+ 		report/report-formatter-csv.cpp report/report-formatter-csv.h \
+ 		report/report-formatter-html.cpp report/report-formatter-html.h \
++		report/report-formatter-plain.cpp report/report-formatter-plain.h \
+ 		main.cpp css.h powertop.css cpu/intel_gpu.cpp
+ 
+ 
+diff --git a/src/Makefile.in b/src/Makefile.in
+index fde9aed..591e675 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -120,6 +120,7 @@ am_powertop_OBJECTS = parameters/powertop-persistent.$(OBJEXT) \
+ 	report/powertop-report-formatter-base.$(OBJEXT) \
+ 	report/powertop-report-formatter-csv.$(OBJEXT) \
+ 	report/powertop-report-formatter-html.$(OBJEXT) \
++	report/powertop-report-formatter-plain.$(OBJEXT) \
+ 	powertop-main.$(OBJEXT) cpu/powertop-intel_gpu.$(OBJEXT)
+ nodist_powertop_OBJECTS =
+ powertop_OBJECTS = $(am_powertop_OBJECTS) $(nodist_powertop_OBJECTS)
+@@ -357,6 +358,7 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
+ 		report/report-formatter-base.cpp report/report-formatter-base.h \
+ 		report/report-formatter-csv.cpp report/report-formatter-csv.h \
+ 		report/report-formatter-html.cpp report/report-formatter-html.h \
++		report/report-formatter-plain.cpp report/report-formatter-plain.h \
+ 		main.cpp css.h powertop.css cpu/intel_gpu.cpp
+ 
+ powertop_CXXFLAGS = -fno-omit-frame-pointer -fstack-protector -Wall -Wshadow -Wformat $(NCURSES_CFLAGS) $(PCIUTILS_CFLAGS) $(LIBNL_CFLAGS) $(GLIB2_CFLAGS)
+@@ -604,6 +606,8 @@ report/powertop-report-formatter-csv.$(OBJEXT):  \
+ 	report/$(am__dirstamp) report/$(DEPDIR)/$(am__dirstamp)
+ report/powertop-report-formatter-html.$(OBJEXT):  \
+ 	report/$(am__dirstamp) report/$(DEPDIR)/$(am__dirstamp)
++report/powertop-report-formatter-plain.$(OBJEXT):  \
++	report/$(am__dirstamp) report/$(DEPDIR)/$(am__dirstamp)
+ cpu/powertop-intel_gpu.$(OBJEXT): cpu/$(am__dirstamp) \
+ 	cpu/$(DEPDIR)/$(am__dirstamp)
+ powertop$(EXEEXT): $(powertop_OBJECTS) $(powertop_DEPENDENCIES) $(EXTRA_powertop_DEPENDENCIES) 
+@@ -652,6 +656,7 @@ mostlyclean-compile:
+ 	-rm -f report/powertop-report-formatter-base.$(OBJEXT)
+ 	-rm -f report/powertop-report-formatter-csv.$(OBJEXT)
+ 	-rm -f report/powertop-report-formatter-html.$(OBJEXT)
++	-rm -f report/powertop-report-formatter-plain.$(OBJEXT)
+ 	-rm -f report/powertop-report-maker.$(OBJEXT)
+ 	-rm -f report/powertop-report.$(OBJEXT)
+ 	-rm -f tuning/powertop-bluetooth.$(OBJEXT)
+@@ -712,6 +717,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report-formatter-base.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report-formatter-csv.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report-formatter-html.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report-formatter-plain.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report-maker.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@report/$(DEPDIR)/powertop-report.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@tuning/$(DEPDIR)/powertop-bluetooth.Po@am__quote@
+@@ -1529,6 +1535,20 @@ report/powertop-report-formatter-html.obj: report/report-formatter-html.cpp
+ @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -c -o report/powertop-report-formatter-html.obj `if test -f 'report/report-formatter-html.cpp'; then $(CYGPATH_W) 'report/report-formatter-html.cpp'; else $(CYGPATH_W) '$(srcdir)/report/report-formatter-html.cpp'; fi`
+ 
++report/powertop-report-formatter-plain.o: report/report-formatter-plain.cpp
++@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -MT report/powertop-report-formatter-plain.o -MD -MP -MF report/$(DEPDIR)/powertop-report-formatter-plain.Tpo -c -o report/powertop-report-formatter-plain.o `test -f 'report/report-formatter-plain.cpp' || echo '$(srcdir)/'`report/report-formatter-plain.cpp
++@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) report/$(DEPDIR)/powertop-report-formatter-plain.Tpo report/$(DEPDIR)/powertop-report-formatter-plain.Po
++@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='report/report-formatter-plain.cpp' object='report/powertop-report-formatter-plain.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -c -o report/powertop-report-formatter-plain.o `test -f 'report/report-formatter-plain.cpp' || echo '$(srcdir)/'`report/report-formatter-plain.cpp
++
++report/powertop-report-formatter-plain.obj: report/report-formatter-plain.cpp
++@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -MT report/powertop-report-formatter-plain.obj -MD -MP -MF report/$(DEPDIR)/powertop-report-formatter-plain.Tpo -c -o report/powertop-report-formatter-plain.obj `if test -f 'report/report-formatter-plain.cpp'; then $(CYGPATH_W) 'report/report-formatter-plain.cpp'; else $(CYGPATH_W) '$(srcdir)/report/report-formatter-plain.cpp'; fi`
++@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) report/$(DEPDIR)/powertop-report-formatter-plain.Tpo report/$(DEPDIR)/powertop-report-formatter-plain.Po
++@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='report/report-formatter-palin.cpp' object='report/powertop-report-formatter-plain.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -c -o report/powertop-report-formatter-plain.obj `if test -f 'report/report-formatter-plain.cpp'; then $(CYGPATH_W) 'report/report-formatter-plain.cpp'; else $(CYGPATH_W) '$(srcdir)/report/report-formatter-plain.cpp'; fi`
++
+ powertop-main.o: main.cpp
+ @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -MT powertop-main.o -MD -MP -MF $(DEPDIR)/powertop-main.Tpo -c -o powertop-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
+ @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/powertop-main.Tpo $(DEPDIR)/powertop-main.Po
+diff --git a/src/main.cpp b/src/main.cpp
+index 16b1613..747588d 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -68,16 +68,23 @@ int debug_learning = 0;
+ unsigned time_out = 20;
+ int leave_powertop = 0;
+ 
++enum {
++	OPT_AUTO_TUNE = CHAR_MAX + 1,
++	OPT_EXTECH,
++	OPT_DEBUG
++};
++
+ static const struct option long_options[] =
+ {
+ 	/* These options set a flag. */
+-	{"debug", no_argument, &debug_learning, 'd'},
++	{"debug", no_argument, &debug_learning, OPT_DEBUG},
+ 	{"version", no_argument, NULL, 'V'},
+ 	{"help",no_argument, NULL, 'u'}, /* u for usage */
+ 	{"calibrate",no_argument, NULL, 'c'},
+-	{"html", optional_argument, NULL, 'h'},
++	{"html", optional_argument, NULL, 'r'},
+ 	{"csv", optional_argument, NULL, 'C'},
+-	{"extech", optional_argument, NULL, 'e'},
++	{"dump", optional_argument, NULL, 'd'},
++	{"extech", optional_argument, NULL, OPT_EXTECH},
+ 	{"time", optional_argument, NULL, 't'},
+ 	{"iteration", optional_argument, NULL, 'i'},
+ 	{"workload", optional_argument, NULL, 'w'},
+@@ -108,14 +115,15 @@ static void print_usage()
+ {
+ 	printf("%s\n\n",_("Usage: powertop [OPTIONS]"));
+ 	printf("--debug \t\t %s\n",_("run in \"debug\" mode"));
+-	printf("--version \t\t %s\n",_("print version information"));
+-	printf("--calibrate \t\t %s\n",_("runs powertop in calibration mode"));
++	printf("-V, --version \t\t %s\n",_("print version information"));
++	printf("-c, --calibrate \t\t %s\n",_("runs powertop in calibration mode"));
+ 	printf("--extech%s \t %s\n",_("[=devnode]"),_("uses an Extech Power Analyzer for measurements"));
+-	printf("--html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
+-	printf("--csv%s \t %s\n",_("[=FILENAME]"),_("generate a csv report"));
+-	printf("--time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
+-	printf("--iteration%s\n", _("[=iterations] number of times to run each test"));
+-	printf("--workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
++	printf("-r, --html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
++	printf("-C, --csv%s \t %s\n",_("[=FILENAME]"), _("generate a csv report"));
++	printf("-d, --dump%s \t %s\n", _("[=FILENAME]"), _("generate plain text report"));
++	printf("-t, --time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
++	printf("-i, --iteration%s\n", _("[=iterations] number of times to run each test"));
++	printf("-w, --workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
+ 	printf("--quiet \t\t %s\n", _("suppress stderr output"));
+ 	printf("--help \t\t\t %s\n",_("print this help menu"));
+ 	printf("\n");
+@@ -371,7 +379,7 @@ int main(int argc, char **argv)
+ 	textdomain (PACKAGE);
+ 
+ 	while (1) { /* parse commandline options */
+-		c = getopt_long (argc, argv, "ch:C:i:t:uVw:q", long_options, &option_index);
++		c = getopt_long (argc, argv, "ch::C::d::r::i:t:uVw:q", long_options, &option_index);
+ 		/* Detect the end of the options. */
+ 		if (c == -1)
+ 			break;
+@@ -382,7 +390,10 @@ int main(int argc, char **argv)
+ 				exit(0);
+ 				break;
+ 
+-			case 'e': /* Extech power analyzer support */
++			case OPT_DEBUG:
++				/* implemented using getopt_long(3) flag */
++				break;
++			case OPT_EXTECH: /* Extech power analyzer support */
+ 				checkroot();
+ 				extech_power_meter(optarg ? optarg : "/dev/ttyUSB0");
+ 				break;
+@@ -396,9 +407,15 @@ int main(int argc, char **argv)
+ 				calibrate();
+ 				break;
+ 
+-			case 'h': /* html report */
++			case 'h': /* for backward compatibility */
++			case 'r': /* html report */
+ 				reporttype = REPORT_HTML;
+-				sprintf(filename, "%s", optarg ? optarg : "powertop.html" );
++				snprintf(filename, 4096, "%s", optarg ? optarg : "powertop.html" );
++				if (!strlen(filename))
++				{
++					fprintf(stderr, _("Invalid HTML filename\n"));
++					exit(1);
++				}
+ 				break;
+ 
+ 			case 't':
+@@ -419,7 +436,16 @@ int main(int argc, char **argv)
+ 
+ 			case 'C': /* csv report*/
+ 				reporttype = REPORT_CSV;
+-				sprintf(filename, "%s", optarg ? optarg : "powertop.csv");
++				snprintf(filename, 4096, "%s", optarg ? optarg : "powertop.csv");
++				if (!strlen(filename))
++				{
++					fprintf(stderr, _("Invalid CSV filename\n"));
++					exit(1);
++				}
++				break;
++			case 'd': /* plain text report (dump) */
++				reporttype = REPORT_PLAIN;
++				snprintf(filename, sizeof(filename), "%s", optarg ? optarg : "-");
+ 				break;
+ 			case '?': /* Unknown option */
+ 				/* getopt_long already printed an error message. */
+diff --git a/src/report/report-maker.cpp b/src/report/report-maker.cpp
+index 59e83d9..7b7ac05 100644
+--- a/src/report/report-maker.cpp
++++ b/src/report/report-maker.cpp
+@@ -32,6 +32,7 @@
+ #include "report-maker.h"
+ #include "report-formatter-csv.h"
+ #include "report-formatter-html.h"
++#include "report-formatter-plain.h"
+ 
+ /* ************************************************************************ */
+ 
+@@ -113,6 +114,8 @@ report_maker::setup_report_formatter()
+ 		formatter = new report_formatter_html();
+ 	else if (type == REPORT_CSV)
+ 		formatter = new report_formatter_csv();
++	else if (type == REPORT_PLAIN)
++		formatter = new report_formatter_plain();
+ 	else if (type == REPORT_OFF)
+ 		formatter = new report_formatter();
+ 	else
+diff --git a/src/report/report-maker.h b/src/report/report-maker.h
+index 75e0d06..a589cd8 100644
+--- a/src/report/report-maker.h
++++ b/src/report/report-maker.h
+@@ -76,7 +76,7 @@
+ 
+ /* Conditional gettext. We need original strings for CSV. */
+ #define __(STRING) \
+-	((report.get_type() == REPORT_CSV) ? (STRING) : gettext(STRING))
++	((report.get_type() == REPORT_CSV || report.get_type() == REPORT_PLAIN) ? (STRING) : gettext(STRING))
+ 
+ #ifndef UNUSED
+ #define UNUSED __attribute__((unused))
+@@ -87,7 +87,8 @@
+ enum report_type {
+ 	REPORT_OFF,
+ 	REPORT_HTML,
+-	REPORT_CSV
++	REPORT_CSV,
++	REPORT_PLAIN
+ };
+ 
+ /* ************************************************************************ */
+diff --git a/src/report/report-formatter-plain.cpp b/src/report/report-formatter-plain.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/report/report-formatter-plain.cpp
+@@ -0,0 +1,174 @@
++/* Copyright (c) 2016 Jaroslav Škarvada <jskarvad@redhat.com>
++ * Based on CSV formatter code by Igor Zhbanov <i.zhbanov@samsung.com>
++ *
++ * This file is part of PowerTOP
++ *
++ * This program file is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program in a file named COPYING; if not, write to the
++ * Free Software Foundation, Inc,
++ * 51 Franklin Street, Fifth Floor,
++ * Boston, MA 02110-1301 USA
++ * or just google for it.
++ */
++
++#define _BSD_SOURCE
++
++/* Uncomment to disable asserts */
++/*#define NDEBUG*/
++
++#include <stdio.h>
++#include <assert.h>
++#include <stdarg.h>
++
++#include "report-formatter-plain.h"
++
++static const char report_plain_header[] = "PowerTOP Report";
++
++/* ************************************************************************ */
++
++report_formatter_plain::report_formatter_plain()
++{
++	add_doc_header();
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::finish_report()
++{
++	/* Do nothing special */
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::add_doc_header()
++{
++	add_header(report_plain_header, 1);
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::add_header(const char *header, int level)
++{
++	assert(header);
++
++	addf("%.*s%s%.*s", 4 - level, "===", header, 4 - level, "===");
++	add_exact("\n");
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::begin_section(section_type stype)
++{
++	/* Do nothing special */
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::end_section()
++{
++	/* Do nothing special */
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::begin_table(table_type ttype)
++{
++	add_exact("\n");
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::end_table()
++{
++	add_exact("\n");
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::begin_row(row_type rtype)
++{
++	table_cell_number = 0;
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::end_row()
++{
++	add_exact("\n");
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::begin_cell(cell_type ctype)
++{
++	if (table_cell_number > 0)
++		add_exact(" ");
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::end_cell()
++{
++	table_cell_number++;
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::add_empty_cell()
++{
++	/* Do nothing special */
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::begin_paragraph()
++{
++	/* Do nothing special */
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::end_paragraph()
++{
++	add_exact("\n");
++}
++
++/* ************************************************************************ */
++
++std::string
++report_formatter_plain::escape_string(const char *str)
++{
++	assert(str);
++	return std::string(str);
++}
++
++/* ************************************************************************ */
++
++void
++report_formatter_plain::set_cpu_number(int nr UNUSED)
++{
++	/* Do nothing */
++}
+diff --git a/src/report/report-formatter-plain.h b/src/report/report-formatter-plain.h
+new file mode 100644
+--- /dev/null
++++ b/src/report/report-formatter-plain.h
+@@ -0,0 +1,64 @@
++/* Copyright (c) 2016 Jaroslav Škarvada <jskarvad@redhat.com>
++ * Based on CSV formatter code by Igor Zhbanov <i.zhbanov@samsung.com>
++ *
++ * This file is part of PowerTOP
++ *
++ * This program file is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program in a file named COPYING; if not, write to the
++ * Free Software Foundation, Inc,
++ * 51 Franklin Street, Fifth Floor,
++ * Boston, MA 02110-1301 USA
++ * or just google for it.
++ */
++
++#ifndef _REPORT_FORMATTER_PLAIN_H_
++#define _REPORT_FORMATTER_PLAIN_H_
++
++#include <string>
++
++#include "report-formatter-base.h"
++
++class report_formatter_plain: public report_formatter_string_base
++{
++public:
++	report_formatter_plain();
++
++	void finish_report();
++
++	void add_header(const char *header, int level);
++
++	void begin_section(section_type stype);
++	void end_section();
++
++	void begin_table(table_type ttype);
++	void end_table();
++
++	void begin_row(row_type rtype);
++	void end_row();
++
++	void begin_cell(cell_type ctype);
++	void end_cell();
++	void add_empty_cell();
++
++	void begin_paragraph();
++	void end_paragraph();
++
++	void set_cpu_number(int nr);
++
++private:
++	void add_doc_header();
++
++	std::string escape_string(const char *str);
++	size_t table_cell_number;
++};
++
++#endif /* _REPORT_FORMATTER_PLAIN_H_ */
+diff --git a/src/report/report.cpp b/src/report/report.cpp
+index c018bb1..b1444b3 100644
+--- a/src/report/report.cpp
++++ b/src/report/report.cpp
+@@ -149,32 +149,38 @@ static void system_info(void)
+ void init_report_output(char *filename_str, int iterations)
+ {
+ 	size_t period;
+-	char file_prefix[4096];
+-	char file_postfix[8];
++	string filename;
+ 	time_t stamp;
+ 	char datestr[200];
++	int len;
+ 
+-	string mystring = string(filename_str);
+-	sprintf(file_postfix, "%s",
+-		(reporttype == REPORT_HTML ? "html" : "csv"));
+-	period=mystring.find_last_of(".");
+-	sprintf(file_prefix, "%s",mystring.substr(0,period).c_str());
+-	memset(&datestr, 0, 200);
+-	memset(&stamp, 0, sizeof(time_t));
+-	stamp=time(NULL);
+-	strftime(datestr, sizeof(datestr), "%Y%m%d-%H%M%S", localtime(&stamp));
+-
+-	if (iterations != 1)
+-		sprintf(reportout.filename, "%s-%s.%s",
+-			file_prefix, datestr,file_postfix);
++	len = strlen(filename_str);
++	if (!len || (len == 1 && filename_str[0] == '-'))
++		reportout.report_file = stdout;
+ 	else
+-		sprintf(reportout.filename, "%s.%s",
+-			file_prefix, file_postfix);
++	{
++		if (iterations == 1)
++			sprintf(reportout.filename, "%s", filename_str);
++		else
++		{
++			filename = string(filename_str);
++			period = filename.find_last_of(".");
++			if (period > filename.length())
++				period = filename.length();
++			memset(&datestr, 0, 200);
++			memset(&stamp, 0, sizeof(time_t));
++			stamp = time(NULL);
++			strftime(datestr, sizeof(datestr), "%Y%m%d-%H%M%S", localtime(&stamp));
++			snprintf(reportout.filename, 4096, "%s-%s%s",
++				filename.substr(0, period).c_str(), datestr,
++				filename.substr(period).c_str());
++		}
+ 
+-	reportout.report_file = fopen(reportout.filename, "wm");
+-	if (!reportout.report_file) {
+-		fprintf(stderr, _("Cannot open output file %s (%s)\n"),
+-			reportout.filename, strerror(errno));
++		reportout.report_file = fopen(reportout.filename, "wm");
++		if (!reportout.report_file) {
++			fprintf(stderr, _("Cannot open output file %s (%s)\n"),
++				reportout.filename, strerror(errno));
++		}
+ 	}
+ 
+ 	report.set_type(reporttype);
+@@ -189,10 +195,14 @@ void finish_report_output(void)
+ 	report.finish_report();
+ 	if (reportout.report_file)
+ 	{
+-		fprintf(stderr, _("PowerTOP outputing using base filename %s\n"), reportout.filename);
++		if (reportout.report_file == stdout)
++			fprintf(stderr, _("PowerTOP outputing using standard output\n"));
++		else
++			fprintf(stderr, _("PowerTOP outputing using base filename %s\n"), reportout.filename);
+ 		fputs(report.get_result(), reportout.report_file);
+ 		fdatasync(fileno(reportout.report_file));
+-		fclose(reportout.report_file);
++		if (reportout.report_file != stdout)
++			fclose(reportout.report_file);
+ 	}
+ 	report.clear_result();
+ }
