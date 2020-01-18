@@ -1,0 +1,170 @@
+diff --git a/src/cpu/cpu.cpp b/src/cpu/cpu.cpp
+index 1eb340c..b021955 100644
+--- a/src/cpu/cpu.cpp
++++ b/src/cpu/cpu.cpp
+@@ -57,6 +57,7 @@ class perf_power_bundle: public perf_bundle
+ 
+ static class abstract_cpu * new_package(int package, int cpu, char * vendor, int family, int model)
+ {
++	uint64_t msr;
+ 	class abstract_cpu *ret = NULL;
+ 	class cpudevice *cpudev;
+ 	char packagename[128];
+@@ -71,15 +72,19 @@ static class abstract_cpu * new_package(int package, int cpu, char * vendor, int
+ 			case 0x25:	/* Westmere */
+ 			case 0x27:	/* Medfield Atom*/
+ 			case 0x2C:	/* Westmere */
+-				ret = new class nhm_package;
++				if (read_msr(cpu, MSR_APERF, &msr) >= 0)
++					ret = new class nhm_package;
+ 				break;
+ 			case 0x2A:	/* SNB */
+ 			case 0x2D:	/* SNB Xeon */
+ 			case 0x3A:      /* IVB */
+ 			case 0x3C:
+ 			case 0x3D:      /* IVB Xeon */
+-				has_c2c7_res = 1;
+-				ret = new class nhm_package;
++				if (read_msr(cpu, MSR_PKG_C7_RESIDENCY, &msr) >= 0)
++				{
++					has_c2c7_res = 1;
++					ret = new class nhm_package;
++				}
+ 				break;
+ 			}
+ 	}
+@@ -99,6 +104,7 @@ static class abstract_cpu * new_package(int package, int cpu, char * vendor, int
+ 
+ static class abstract_cpu * new_core(int core, int cpu, char * vendor, int family, int model)
+ {
++	uint64_t msr;
+ 	class abstract_cpu *ret = NULL;
+ 
+ 	if (strcmp(vendor, "GenuineIntel") == 0) {
+@@ -116,7 +122,8 @@ static class abstract_cpu * new_core(int core, int cpu, char * vendor, int famil
+ 			case 0x3A:      /* IVB */
+ 			case 0x3C:
+ 			case 0x3D:      /* IVB Xeon */
+-				ret = new class nhm_core;
++				if (read_msr(cpu, MSR_APERF, &msr) >= 0)
++					ret = new class nhm_core;
+ 			}
+ 	}
+ 
+@@ -142,6 +149,7 @@ static class abstract_cpu * new_i965_gpu(void)
+ 
+ static class abstract_cpu * new_cpu(int number, char * vendor, int family, int model)
+ {
++	uint64_t msr;
+ 	class abstract_cpu * ret = NULL;
+ 
+ 	if (strcmp(vendor, "GenuineIntel") == 0) {
+@@ -159,7 +167,8 @@ static class abstract_cpu * new_cpu(int number, char * vendor, int family, int m
+ 			case 0x3A:      /* IVB */
+ 			case 0x3C:
+ 			case 0x3D:      /* IVB Xeon */
+-				ret = new class nhm_cpu;
++				if (read_msr(number, MSR_APERF, &msr) >= 0)
++					ret = new class nhm_cpu;
+ 			}
+ 	}
+ 
+diff --git a/src/cpu/intel_cpus.cpp b/src/cpu/intel_cpus.cpp
+index 2b78d31..8d5f51a 100644
+--- a/src/cpu/intel_cpus.cpp
++++ b/src/cpu/intel_cpus.cpp
+@@ -49,30 +49,15 @@ static uint64_t get_msr(int cpu, uint64_t offset)
+ {
+ 	ssize_t retval;
+ 	uint64_t msr;
+-	int fd;
+-	char msr_path[256];
+ 
+-	fd = sprintf(msr_path, "/dev/cpu/%d/msr", cpu);
+-
+-	if (access(msr_path, R_OK) != 0){
+-		fd = sprintf(msr_path, "/dev/msr%d", cpu);
+-
+-		if (access(msr_path, R_OK) != 0){
+-			fprintf(stderr, _("msr reg not found"));
+-			exit(-2);
+-		}
+-	}
+-
+-	fd = open(msr_path, O_RDONLY);
+-
+-	retval = pread(fd, &msr, sizeof msr, offset);
+-	if (retval != sizeof msr) {
++	retval = read_msr(cpu, offset, &msr);
++	if (retval < 0) {
+ 		reset_display();
+-		fprintf(stderr, _("pread cpu%d 0x%llx : "), cpu, (unsigned long long)offset);
++		fprintf(stderr, _("read_msr cpu%d 0x%llx : "), cpu, (unsigned long long)offset);
+ 		fprintf(stderr, "%s\n", strerror(errno));
+ 		exit(-2);
+ 	}
+-	close(fd);
++
+ 	return msr;
+ }
+ 
+diff --git a/src/lib.cpp b/src/lib.cpp
+index 723517a..6993088 100644
+--- a/src/lib.cpp
++++ b/src/lib.cpp
+@@ -56,6 +56,7 @@ extern "C" {
+ #include <limits>
+ #include <math.h>
+ #include <ncurses.h>
++#include <fcntl.h>
+ 
+ static int kallsyms_read = 0;
+ 
+@@ -450,3 +451,36 @@ int get_user_input(char *buf, unsigned sz)
+ 	/* to distinguish between getnstr error and empty line */
+ 	return ret || strlen(buf);
+ }
++
++int read_msr(int cpu, uint64_t offset, uint64_t *value)
++{
++	ssize_t retval;
++	uint64_t msr;
++	int fd;
++	char msr_path[256];
++
++	sprintf(msr_path, "/dev/cpu/%d/msr", cpu);
++
++	if (access(msr_path, R_OK) != 0){
++		sprintf(msr_path, "/dev/msr%d", cpu);
++
++		if (access(msr_path, R_OK) != 0){
++			fprintf(stderr,
++			 _("Model-specific registers (MSR)\
++			 not found (try enabling CONFIG_X86_MSR).\n"));
++			return -1;
++		}
++	}
++
++	fd = open(msr_path, O_RDONLY);
++	if (fd < 0)
++		return -1;
++	retval = pread(fd, &msr, sizeof msr, offset);
++	close(fd);
++	if (retval != sizeof msr) {
++		return -1;
++	}
++	*value = msr;
++
++	return retval;
++}
+diff --git a/src/lib.h b/src/lib.h
+index de2de5a..1c9ca42 100644
+--- a/src/lib.h
++++ b/src/lib.h
+@@ -74,5 +74,6 @@ typedef void (*callback)(const char*);
+ extern void process_directory(const char *d_name, callback fn);
+ extern int utf_ok;
+ extern int get_user_input(char *buf, unsigned sz);
++extern int read_msr(int cpu, uint64_t offset, uint64_t *value);
+ 
+ #endif

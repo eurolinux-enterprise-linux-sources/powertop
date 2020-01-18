@@ -1,0 +1,13 @@
+diff -up powertop-2.3/doc/powertop.8.orig powertop-2.3/doc/powertop.8
+--- powertop-2.3/doc/powertop.8.orig	2013-01-31 22:39:27.000000000 +0100
++++ powertop-2.3/doc/powertop.8	2013-06-25 15:51:49.000000000 +0200
+@@ -46,6 +46,9 @@ sent to others to help diagnose power is
+ \fB\-\-iteration[\fR=\fIiterations\fR]
+ number of times to run each test.
+ .TP
++\fB\-\-workload[\fR=\fIworkload\fR]
++file to execute for workload.
++.TP
+ \fB\-\-quiet
+  supress stderr output.
+ .TP

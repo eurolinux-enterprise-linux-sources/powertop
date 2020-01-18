@@ -1,0 +1,33 @@
+diff -up ./src/devices/network.cpp.orig ./src/devices/network.cpp
+--- ./src/devices/network.cpp.orig	2013-10-29 08:26:59.000000000 +0100
++++ ./src/devices/network.cpp	2013-10-29 08:30:52.100379762 +0100
+@@ -346,9 +346,29 @@ const char * network::device_name(void)
+ 
+ void netdev_callback(const char *d_name)
+ {
++	char devname[128];
++
+ 	std::string f_name("/sys/class/net/");
+ 	f_name.append(d_name);
+ 
++	sprintf(devname, "%s-up", d_name);
++	register_parameter(devname);
++
++	sprintf(devname, "%s-powerunsave", d_name);
++	register_parameter(devname);
++
++	sprintf(devname, "%s-link-100", d_name);
++	register_parameter(devname);
++
++	sprintf(devname, "%s-link-1000", d_name);
++	register_parameter(devname);
++
++	sprintf(devname, "%s-link-high", d_name);
++	register_parameter(devname);
++
++	sprintf(devname, "%s-packets", d_name);
++	register_parameter(devname);
++
+ 	network *bl = new(std::nothrow) class network(d_name, f_name.c_str());
+ 	if (bl) {
+ 		all_devices.push_back(bl);
