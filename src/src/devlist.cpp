@@ -38,6 +38,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 
 using namespace std;
 
@@ -45,6 +46,7 @@ using namespace std;
 #include "lib.h"
 #include "report/report.h"
 #include "report/report-maker.h"
+#include "report/report-data-html.h"
 
 #include "process/process.h"
 #include "devices/device.h"
@@ -63,6 +65,7 @@ using namespace std;
 
 static vector<struct devuser *> one;
 static vector<struct devuser *> two;
+static vector<struct devpower *> devpower;
 
 static int phase;
 /*
@@ -70,14 +73,29 @@ static int phase;
  * 1 - one = after,   two = before
  */
 
+void clean_open_devices()
+{
+	unsigned int i=0;
 
+	for (i = 0; i < one.size(); i++) {
+		free(one[i]);
+	}
+
+	for (i = 0; i < two.size(); i++) {
+		free(two[i]);
+	}
+
+	for (i = 0; i < devpower.size(); i++){
+		free(devpower[i]);
+	}
+}
 
 void collect_open_devices(void)
 {
 	struct dirent *entry;
 	DIR *dir;
-	char filename[4096];
-	char link[4096];
+	char filename[PATH_MAX];
+	char link[PATH_MAX];
 	unsigned int i;
 	vector<struct devuser *> *target;
 
@@ -107,7 +125,7 @@ void collect_open_devices(void)
 		if (strcmp(entry->d_name, "self") == 0)
 			continue;
 
-		sprintf(filename, "/proc/%s/fd/", entry->d_name);
+		snprintf(filename, sizeof(filename), "/proc/%s/fd/", entry->d_name);
 
 		dir2 = opendir(filename);
 		if (!dir2)
@@ -120,9 +138,9 @@ void collect_open_devices(void)
 				break;
 			if (!isdigit(entry2->d_name[0]))
 				continue;
-			sprintf(filename, "/proc/%s/fd/%s", entry->d_name, entry2->d_name);
-			memset(link, 0, 4096);
-			ret = readlink(filename, link, 4095);
+			snprintf(filename, sizeof(filename), "/proc/%s/fd/%s", entry->d_name, entry2->d_name);
+			memset(link, 0, sizeof(link));
+			ret = readlink(filename, link, sizeof(link) - 1);
 			if (ret < 0)
 				continue;
 
@@ -178,7 +196,7 @@ int charge_device_to_openers(const char *devstring, double power, class device *
 	for (i = 0; i < one.size(); i++) {
 		if (strstr(one[i]->device, devstring))
 			openers++;
-		}
+	}
 	for (i = 0; i < two.size(); i++) {
 		if (strstr(two[i]->device, devstring))
 			openers++;
@@ -223,8 +241,6 @@ int charge_device_to_openers(const char *devstring, double power, class device *
 	return openers;
 }
 
-static vector<struct devpower *> devpower;
-
 void clear_devpower(void)
 {
 	unsigned int i;
@@ -247,7 +263,7 @@ void register_devpower(const char *devstring, double power, class device *_dev)
 
 	if (!dev) {
 		dev = (struct devpower *)malloc(sizeof (struct devpower));
-		strcpy(dev->device, devstring);
+		pt_strcpy(dev->device, devstring);
 		dev->power = 0.0;
 		devpower.push_back(dev);
 	}
@@ -284,9 +300,9 @@ void report_show_open_devices(void)
 	vector<struct devuser *> *target;
 	unsigned int i;
 	char prev[128], proc[128];
+	int idx, cols, rows;
 
 	prev[0] = 0;
-
 	if (phase == 1)
 		target = &one;
 	else
@@ -295,27 +311,41 @@ void report_show_open_devices(void)
 	if (target->size() == 0)
 		return;
 
-	sort(target->begin(), target->end(), devlist_sort);
 
-	report.add_header("Process device activity");
-	report.begin_table(TABLE_WIDE);
-	report.begin_row();
-	report.begin_cell(CELL_DEVACTIVITY_PROCESS);
-	report.add("Process");
-	report.begin_cell(CELL_DEVACTIVITY_DEVICE);
-	report.add("Device");
+	/* Set Table attributes, rows, and cols */
+	table_attributes std_table_css;
+	cols = 2;
+	idx = cols;
+	rows= target->size() + 1;
+	init_std_table_attr(&std_table_css, rows, cols);
+
+	/* Set Title attributes */
+	tag_attr title_attr;
+	init_title_attr(&title_attr);
+
+	/* Set array of data in row Major order */
+	string *process_data = new string[cols * rows];
+
+	sort(target->begin(), target->end(), devlist_sort);
+	process_data[0]=__("Process");
+	process_data[1]=__("Device");
 
 	for (i = 0; i < target->size(); i++) {
 		proc[0] = 0;
-
 		if (strcmp(prev, (*target)[i]->comm) != 0)
-			sprintf(proc, "%s", (*target)[i]->comm);
+			snprintf(proc, sizeof(proc), "%s", (*target)[i]->comm);
 
-		report.begin_row(ROW_DEVPOWER);
-		report.begin_cell();
-		report.add(proc);
-		report.begin_cell();
-		report.add((*target)[i]->device);
-		sprintf(prev, "%s", (*target)[i]->comm);
+		process_data[idx]=string(proc);
+		idx+=1;
+		process_data[idx]=string((*target)[i]->device);
+		idx+=1;
+		snprintf(prev, sizeof(prev), "%s", (*target)[i]->comm);
 	}
+
+	/* Report Output */
+	/* No div attribute here inherits from device power report */
+	report.add_title(&title_attr, __("Process Device Activity"));
+	report.add_table(process_data, &std_table_css);
+	delete [] process_data;
+	report.end_div();
 }

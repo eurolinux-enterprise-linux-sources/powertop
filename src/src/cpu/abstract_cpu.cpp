@@ -27,8 +27,23 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "cpu.h"
 #include "../lib.h"
+
+abstract_cpu::~abstract_cpu()
+{
+	unsigned int i=0;
+	for (i=0; i < cstates.size(); i++){
+		delete cstates[i];
+	}
+	cstates.clear();
+
+	for (i=0; i < pstates.size(); i++){
+		delete pstates[i];
+	}
+	pstates.clear();
+}
 
 void abstract_cpu::account_freq(uint64_t freq, uint64_t duration)
 {
@@ -56,9 +71,9 @@ void abstract_cpu::account_freq(uint64_t freq, uint64_t duration)
 		state->freq = freq;
 		hz_to_human(freq, state->human_name);
 		if (freq == 0)
-			strcpy(state->human_name, _("Idle"));
+			pt_strcpy(state->human_name, _("Idle"));
 		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
-			sprintf(state->human_name, _("Turbo Mode"));
+			pt_strcpy(state->human_name, _("Turbo Mode"));
 
 		state->after_count = 1;
 	}
@@ -97,7 +112,7 @@ void abstract_cpu::measurement_start(void)
 	old_idle = true;
 
 
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_available_frequencies", number);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_available_frequencies", number);
 	file.open(filename, ios::in);
 	if (file) {
 		file >> max_frequency;
@@ -190,11 +205,11 @@ void abstract_cpu::insert_cstate(const char *linux_name, const char *human_name,
 
 	cstates.push_back(state);
 
-	strcpy(state->linux_name, linux_name);
-	strcpy(state->human_name, human_name);
+	pt_strcpy(state->linux_name, linux_name);
+	pt_strcpy(state->human_name, human_name);
 
 	state->line_level = -1;
-	
+
 	c = human_name;
 	while (*c) {
 		if (strcmp(linux_name, "active")==0) {
@@ -217,7 +232,7 @@ void abstract_cpu::insert_cstate(const char *linux_name, const char *human_name,
 		}
 		c++;
 	}
-	
+
 	if (level >= 0)
 		state->line_level = level;
 
@@ -322,7 +337,7 @@ void abstract_cpu::insert_pstate(uint64_t freq, const char *human_name, uint64_t
 	pstates.push_back(state);
 
 	state->freq = freq;
-	strcpy(state->human_name, human_name);
+	pt_strcpy(state->human_name, human_name);
 
 
 	state->time_before = duration;
@@ -424,21 +439,29 @@ void abstract_cpu::change_effective_frequency(uint64_t time, uint64_t frequency)
 
 void abstract_cpu::wiggle(void)
 {
-	char filename[4096];
+	char filename[PATH_MAX];
 	ifstream ifile;
 	ofstream ofile;
 	uint64_t minf,maxf;
+	uint64_t setspeed = 0;
 
 	/* wiggle a CPU so that we have a record of it at the start and end of the perf trace */
 
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_max_freq", first_cpu);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_max_freq", first_cpu);
 	ifile.open(filename, ios::in);
 	ifile >> maxf;
 	ifile.close();
 
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_min_freq", first_cpu);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_min_freq", first_cpu);
 	ifile.open(filename, ios::in);
 	ifile >> minf;
+	ifile.close();
+
+	/* In case of the userspace governor, remember the old setspeed setting, it will be affected by wiggle */
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_setspeed", first_cpu);
+	ifile.open(filename, ios::in);
+	/* Note that non-userspace governors report "<unsupported>". In that case ifile will fail and setspeed remains 0 */
+	ifile >> setspeed;
 	ifile.close();
 
 	ofile.open(filename, ios::out);
@@ -447,7 +470,7 @@ void abstract_cpu::wiggle(void)
 	ofile.open(filename, ios::out);
 	ofile << minf;
 	ofile.close();
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_max_freq", first_cpu);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_max_freq", first_cpu);
 	ofile.open(filename, ios::out);
 	ofile << minf;
 	ofile.close();
@@ -455,6 +478,12 @@ void abstract_cpu::wiggle(void)
 	ofile << maxf;
 	ofile.close();
 
+	if (setspeed != 0) {
+		snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/scaling_setspeed", first_cpu);
+		ofile.open(filename, ios::out);
+		ofile << setspeed;
+		ofile.close();
+	}
 }
 uint64_t abstract_cpu::total_pstate_time(void)
 {

@@ -27,9 +27,9 @@
 
 #include <stdio.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <limits.h>
 
 
 using namespace std;
@@ -44,35 +44,35 @@ using namespace std;
 rfkill::rfkill(char *_name, char *path): device()
 {
 	char line[4096];
-	char filename[4096];
+	char filename[PATH_MAX];
 	char devname[128];
 	start_soft = 0;
 	start_hard = 0;
 	end_soft = 0;
 	end_hard = 0;
-	strncpy(sysfs_path, path, sizeof(sysfs_path));
+	pt_strcpy(sysfs_path, path);
 	register_sysfs_path(sysfs_path);
-	sprintf(devname, "radio:%s", _name);
-	sprintf(humanname, "radio:%s", _name);
-	strncpy(name, devname, sizeof(name));
+	snprintf(devname, sizeof(devname), "radio:%s", _name);
+	snprintf(humanname, sizeof(humanname), "radio:%s", _name);
+	pt_strcpy(name, devname);
 	register_parameter(devname);
 	index = get_param_index(devname);
 	rindex = get_result_index(name);
 
 	memset(line, 0, 4096);
-	sprintf(filename, "%s/device/driver", path);
-	if (readlink(filename, line, 4096) > 0) {
-		sprintf(humanname, _("Radio device: %s"), basename(line));
+	snprintf(filename, sizeof(filename), "%s/device/driver", path);
+	if (readlink(filename, line, sizeof(line)) > 0) {
+		snprintf(humanname, sizeof(humanname), _("Radio device: %s"), basename(line));
 	}
-	sprintf(filename, "%s/device/device/driver", path);
-	if (readlink(filename, line, 4096) > 0) {
-		sprintf(humanname, _("Radio device: %s"), basename(line));
+	snprintf(filename, sizeof(filename), "%s/device/device/driver", path);
+	if (readlink(filename, line, sizeof(line)) > 0) {
+		snprintf(humanname, sizeof(humanname), _("Radio device: %s"), basename(line));
 	}
 }
 
 void rfkill::start_measurement(void)
 {
-	char filename[4096];
+	char filename[PATH_MAX];
 	ifstream file;
 
 	start_hard = 1;
@@ -80,14 +80,14 @@ void rfkill::start_measurement(void)
 	end_hard = 1;
 	end_soft = 1;
 
-	sprintf(filename, "%s/hard", sysfs_path);
+	snprintf(filename, sizeof(filename), "%s/hard", sysfs_path);
 	file.open(filename, ios::in);
 	if (file) {
 		file >> start_hard;
 	}
 	file.close();
 
-	sprintf(filename, "%s/soft", sysfs_path);
+	snprintf(filename, sizeof(filename), "%s/soft", sysfs_path);
 	file.open(filename, ios::in);
 	if (file) {
 		file >> start_soft;
@@ -97,16 +97,16 @@ void rfkill::start_measurement(void)
 
 void rfkill::end_measurement(void)
 {
-	char filename[4096];
+	char filename[PATH_MAX];
 	ifstream file;
 
-	sprintf(filename, "%s/hard", sysfs_path);
+	snprintf(filename, sizeof(filename), "%s/hard", sysfs_path);
 	file.open(filename, ios::in);
 	if (file) {
 		file >> end_hard;
 	}
 	file.close();
-	sprintf(filename, "%s/soft", sysfs_path);
+	snprintf(filename, sizeof(filename), "%s/soft", sysfs_path);
 	file.open(filename, ios::in);
 	if (file) {
 		file >> end_soft;
@@ -136,41 +136,30 @@ const char * rfkill::device_name(void)
 	return name;
 }
 
-void create_all_rfkills(void)
+static void create_all_rfkills_callback(const char *d_name)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-	char name[4096];
+	char filename[PATH_MAX];
+	char name[4096] = {0};
+	class rfkill *bl;
+	ifstream file;
 
-	dir = opendir("/sys/class/rfkill/");
-	if (!dir)
-		return;
-	while (1) {
-		class rfkill *bl;
-		ifstream file;
-		entry = readdir(dir);
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-		sprintf(filename, "/sys/class/rfkill/%s/name", entry->d_name);
-		strcpy(name, entry->d_name);
-		file.open(filename, ios::in);
-		if (file) {
-			file.getline(name, 100);
-			file.close();
-		}
-
-		sprintf(filename, "/sys/class/rfkill/%s", entry->d_name);
-		bl = new class rfkill(name, filename);
-		all_devices.push_back(bl);
+	snprintf(filename, sizeof(filename), "/sys/class/rfkill/%s/name", d_name);
+	strncpy(name, d_name, sizeof(name) - 1);
+	file.open(filename, ios::in);
+	if (file) {
+		file.getline(name, 100);
+		file.close();
 	}
-	closedir(dir);
 
+	snprintf(filename, sizeof(filename), "/sys/class/rfkill/%s", d_name);
+	bl = new class rfkill(name, filename);
+	all_devices.push_back(bl);
 }
 
-
+void create_all_rfkills(void)
+{
+	process_directory("/sys/class/rfkill/", create_all_rfkills_callback);
+}
 
 double rfkill::power_usage(struct result_bundle *result, struct parameter_bundle *bundle)
 {

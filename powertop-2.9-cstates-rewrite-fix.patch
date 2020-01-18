@@ -1,0 +1,41 @@
+From f3f350f138912dc89abb37676f7e65fc6057ec53 Mon Sep 17 00:00:00 2001
+From: Gautam Paranjape <gautam.paranjape@intel.com>
+Date: Fri, 21 Jul 2017 07:02:13 -0700
+Subject: [PATCH] Some c-states exposed by the intel_idle driver are assigned
+ the same line_level, which means that the most recent one assigned can
+ overwrite another c-state. For example, the C1-SKL c-state is overwritten by
+ the C1E-SKL c-state because both have a "1" in the name and are assigned the
+ same line level. To fix this, check if a "sub c-state" (ex. C1E-SKL) is being
+ inserted. If so, check the vector of c-states if a c-state with similar name
+ (ex. C1-SKL) exists, and increment the line level.
+
+Signed-off-by: Gautam Paranjape <gautam.paranjape@intel.com>
+---
+ src/cpu/abstract_cpu.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/cpu/abstract_cpu.cpp b/src/cpu/abstract_cpu.cpp
+index bc32336..c59721c 100644
+--- a/src/cpu/abstract_cpu.cpp
++++ b/src/cpu/abstract_cpu.cpp
+@@ -218,6 +218,17 @@ void abstract_cpu::insert_cstate(const char *linux_name, const char *human_name,
+ 		}
+ 		if (*c >= '0' && *c <='9') {
+ 			state->line_level = strtoull(c, NULL, 10);
++			if(*(c+1) != '-'){
++				int greater_line_level = strtoull(c, NULL, 10);
++				for(unsigned int pos = 0; pos < cstates.size(); pos++){
++					if(*c == cstates[pos]->human_name[1]){
++						if(*(c+1) != cstates[pos]->human_name[2]){
++							greater_line_level = max(greater_line_level, cstates[pos]->line_level);
++							state->line_level = greater_line_level + 1;
++						}
++					}
++				}
++			}
+ 			break;
+ 		}
+ 		c++;
+-- 
+2.14.3
+

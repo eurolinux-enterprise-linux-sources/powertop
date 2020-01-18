@@ -1,554 +1,263 @@
-<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">
-<html>
+<!DOCTYPE html>
+<html lang='en'>
 <head>
 <title>PowerTOP report</title>
-<meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">
-<script type=\"text/javascript\" src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js\"></script>
-<script type=\"text/javascript\">
-$(document).ready(function(){
+<meta http-equiv='content-type' content='text/html;charset=utf-8'>
 
-	$('#system h2').addClass('hide');
-	$('#system table').addClass('hide');
-	$('#cpuidle h2').addClass('hide');
-	$('#cpuidle table').addClass('hide');
-	$('#cpufreq h2').addClass('hide');
-	$('#cpufreq table').addClass('hide');
-	$('#software h2').addClass('hide');
-	$('#software table').addClass('hide');
-	$('#device h2').addClass('hide');
-	$('#device table').addClass('hide');
-	$('#device p').addClass('hide');
-	$('#tuning h2').addClass('hide');
-	$('#tuning table').addClass('hide');
+<script type='text/javascript'>
 
-	$('#top').append('<div class=\"SystemButton\"   onclick=\"toggleSystem()\">System Info</div>');
-	$('#top').append('<div class=\"SummaryButton\"  onclick=\"toggleSummary()\">Summary</div>');
-	$('#top').append('<div class=\"CpuidleButton\"  onclick=\"toggleCpuidle()\">CPU Idle</div>');
-	$('#top').append('<div class=\"CpufreqButton\"  onclick=\"toggleCpufreq()\">CPU Frequency</div>');
-	$('#top').append('<div class=\"SoftwareButton\" onclick=\"toggleSoftware()\">Software info</div>');
-	$('#top').append('<div class=\"DeviceButton\"   onclick=\"toggleDevice()\">Device Info</div>');
-	$('#top').append('<div class=\"TuningButton\"   onclick=\"toggleTuning()\">Tuning</div>');
-	$('#top').append('<div class=\"AllButton\"      onclick=\"toggleAll()\">All</div>');
-	$('#top .SummaryButton').toggleClass('pressed');
-
-    }
-	);
-function toggleDummy() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-function toggleSystem() {
-		$('#system table').toggleClass('hide', false);
-		$('#system h2').toggleClass('hide', false);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', true);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-function toggleSummary() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', false);
-		$('#summary h2').toggleClass('hide', false);
-		$('#summary p').toggleClass('hide', false);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', true);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-function toggleCpuidle() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', false);
-		$('#cpuidle h2').toggleClass('hide', false);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', true);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-
-}
-function toggleCpufreq() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', false);
-		$('#cpufreq h2').toggleClass('hide', false);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', true);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-
-function toggleSoftware() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', false);
-		$('#software h2').toggleClass('hide', false);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', true);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-
-function toggleDevice() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', false);
-		$('#device h2').toggleClass('hide', false);
-		$('#device p').toggleClass('hide', false);
-		$('#tuning table').toggleClass('hide', true);
-		$('#tuning h2').toggleClass('hide', true);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', true);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-
-function toggleTuning() {
-		$('#system table').toggleClass('hide', true);
-		$('#system h2').toggleClass('hide', true);
-		$('#summary table').toggleClass('hide', true);
-		$('#summary h2').toggleClass('hide', true);
-		$('#summary p').toggleClass('hide', true);
-		$('#cpuidle table').toggleClass('hide', true);
-		$('#cpuidle h2').toggleClass('hide', true);
-		$('#cpufreq table').toggleClass('hide', true);
-		$('#cpufreq h2').toggleClass('hide', true);
-		$('#software table').toggleClass('hide', true);
-		$('#software h2').toggleClass('hide', true);
-		$('#device table').toggleClass('hide', true);
-		$('#device h2').toggleClass('hide', true);
-		$('#device p').toggleClass('hide', true);
-		$('#tuning table').toggleClass('hide', false);
-		$('#tuning h2').toggleClass('hide', false);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', true);
-		$('#top .AllButton').toggleClass('pressed', false);
-}
-function toggleAll() {
-		$('#system table').toggleClass('hide', false);
-		$('#system h2').toggleClass('hide', false);
-		$('#summary table').toggleClass('hide', false);
-		$('#summary h2').toggleClass('hide', false);
-		$('#summary p').toggleClass('hide', false);
-		$('#cpuidle table').toggleClass('hide', false);
-		$('#cpuidle h2').toggleClass('hide', false);
-		$('#cpufreq table').toggleClass('hide', false);
-		$('#cpufreq h2').toggleClass('hide', false);
-		$('#software table').toggleClass('hide', false);
-		$('#software h2').toggleClass('hide', false);
-		$('#device table').toggleClass('hide', false);
-		$('#device h2').toggleClass('hide', false);
-		$('#device p').toggleClass('hide', false);
-		$('#tuning table').toggleClass('hide', false);
-		$('#tuning h2').toggleClass('hide', false);
-		$('#top .SystemButton').toggleClass('pressed', false);
-		$('#top .SummaryButton').toggleClass('pressed', false);
-		$('#top .CpuidleButton').toggleClass('pressed', false);
-		$('#top .CpufreqButton').toggleClass('pressed', false);
-		$('#top .SoftwareButton').toggleClass('pressed', false);
-		$('#top .DeviceButton').toggleClass('pressed', false);
-		$('#top .TuningButton').toggleClass('pressed', false);
-		$('#top .AllButton').toggleClass('pressed', true);
+var powertop = {
+ blocks: {
+  summary: 'Summary',
+  cpuidle: 'CPU Idle',
+  cpufreq: 'CPU Frequency',
+  software: 'Software Info',
+  devinfo: 'Device Info',
+  tuning: 'Tuning',
+  ahci: 'AHCI'
+ },
+ cadd: function(idx, c){
+   var el = document.getElementById(idx);
+   if (el) {
+      var cn = el.className;
+      if (cn.indexOf(c) != -1)
+         return;
+      cn += ' ' + c;
+      el.className = cn;
+   }
+ },
+ crm: function(id, c){
+   var el = document.getElementById(id);
+   if (el) {
+      var cn = el.className
+      while (cn.indexOf(' ' + c) != -1)
+         cn = cn.replace(' ' + c,'');
+      el.className = cn;
+   }
+ },
+ newbutton: function(id, txt) {
+  var x = document.createElement('div');
+  x.id = id + '_button';
+  x.className = 'nav_button';
+  x.textContent = txt;
+  x.innerText = txt;
+  x.onclick = function() { powertop.toggle(id); };
+  return x;
+ },
+ setupbuttons: function() {
+   var t = document.getElementById('main_menu');
+   if (t) {
+     for (var b in powertop.blocks) {
+       t.appendChild(powertop.newbutton(b, powertop.blocks[b]));
+     }
+    t.appendChild(powertop.newbutton('all', 'All'));
+   }
+ },
+ toggle: function(b) {
+   powertop.baseall();
+   if (b == 'all') {
+      for (var c in powertop.blocks) {
+        powertop.crm(c, 'hide');
+      }
+   } else {
+      powertop.crm(b, 'hide');
+   }
+   powertop.cadd(b + '_button', 'pressed');
+ },
+ baseall: function() {
+   for (var b in powertop.blocks) {
+     powertop.cadd(b, 'hide');
+     powertop.crm(b + '_button', 'pressed');
+   }
+   powertop.cadd('all', 'hide');
+   powertop.crm('all_button', 'pressed');
+ },
+ onload: function() {
+   powertop.setupbuttons();
+   powertop.toggle('summary');
+ }
 }
 </script>
-<style type=\"text/css\">
-table
-{
-	background-color: #F8F8F8;
-	color: black;
-}
 
-th
-{
-	text-align: right;
-}
-th.device
-{
-	text-align: left;
-}
-th.process
-{
-	text-align: left;
-}
-
-th.tunable
-{
-	text-align: left;
-}
-
-td.package_odd
-{
-	background-color: #E0ffE0;
-	color: black;
-	text-align: right;
-}
-td.package_even
-{
-	background-color: #F0ffF0;
-	color: black;
-	text-align: right;
-}
-
-td.core_even
-{
-	background-color: #F0ffF0;
-	color: black;
-	text-align: right;
-}
-
-td.core_odd
-{
-	background-color: #E0E0ff;
-	color: black;
-	text-align: right;
-}
-
-td.cpu_even_freq
-{
-	background-color: #E2E2E2;
-	color: black;
-}
-
-td.cpu_odd_freq
-{
-	background-color: #F4f4F4;
-	color: black;
-}
-
-td.cpu_even_even
-{
-	background-color: #E0E0f0;
-	color: black;
-	text-align: right;
-}
-
-td.cpu_even_odd
-{
-	background-color: #F0f0F0;
-	color: black;
-	text-align: right;
-}
-td.cpu_odd_even
-{
-	background-color: #E0E0ff;
-	color: black;
-	text-align: right;
-}
-
-td.cpu_odd_odd
-{
-	background-color: #F0ffF0;
-	color: black;
-	text-align: right;
-}
-
-tr.device_odd
-{
-	background-color: #E0E0E0;
-	color: black;
-}
-tr.device_even
-{
-	background-color: #F0f0F0;
-	color: black;
-}
-
-tr.process_odd
-{
-	background-color: #E0E0E0;
-	color: black;
-}
-tr.process_even
-{
-	background-color: #F0f0F0;
-	color: black;
-}
-
-td.device_power
-{
-	text-align: right;
-}
-
-td.process_power
-{
-	text-align: right;
-}
-
-td.device_util
-{
-	text-align: right;
-}
-
-tr.tunable_odd
-{
-	background-color: #E0E0E0;
-	color: black;
-}
-tr.tunable_even
-{
-	background-color: #F0f0F0;
-	color: black;
-}
-
-tr.tunable_odd_bad
-{
-	background-color: #FFE0E0;
-	color: black;
-}
-tr.tunable_even_bad
-{
-	background-color: #FFf0F0;
-	color: black;
-}
-
-tr.system_odd
-{
-	background-color: #E0E0E0;
-	color: black;
-}
-tr.system_even
-{
-	background-color: #F0f0F0;
-	color: black;
-}
-
-tr.device_odd
-{
-	background-color: #E0E0E0;
-	color: black;
-}
-tr.device_even
-{
-	background-color: #F0f0F0;
-	color: black;
+<style type='text/css'>
+/* General CSS */
+*{
+	margin:0px;
+	padding:0px;
+	width: auto;
 }
 
 body {
 	background-color: #eee; /* Background color */
-	color: #222;            /* Foreground color used for text */
+	color: #222;            /* Font color */
 	font-family: Helvetica;
 	font-size: 14px;
-	margin: 0;              /* Amount of negative space around the
-                                   outside of the body */
-	padding: 0;             /* Amount of negative space around the
-                                   inside of the body */
 }
-#top h1 {
-	margin: 0;
-	padding: 0;
+
+#main_container{
+	margin: 2px auto;
 }
-#top h1 a {
-	background-color: #ccc;
-	border-bottom: 1px solid #666;
-	color: #222;
-	display: block;
-	font-size: 20px;
+
+/* Top logo & system table css */
+#main_header{
+	min-width: 960px;
+}
+
+img.pwtop_logo{
+	float:left;
+	height:40%;
+	width: 40%;
+	padding:20px;
+}
+
+.sys_info
+{
+	float: right;
+	height:116px;
+	width:450px;
+	font-size: 12px;
+	text-align: left;
+}
+
+th{
+	text-align: left;
+}
+
+/* CSS Main Content */
+
+.content_title
+{
+	color: #296629;
+	padding:0px;
+	margin:2px;
+}
+
+#chart_div{
+	float: left;
+}
+
+.small
+{
+	font-size: 10px;
+}
+
+table.emphasis2
+{
+	font-size: 13px;
+	max-width:95%;
+}
+
+
+th.emph_title {
+	padding:5px;
+}
+
+tr.emph1:nth-child(odd) {
+	background: #ffffff;
+}
+
+tr.emph1:nth-child(even) {
+	background: #ebebeb;
+}
+
+tr.tune:nth-child(odd) {
+	background: #fffcfc;
+}
+tr.tune:nth-child(even) {
+	background: #fff0f0;
+}
+
+td.no_wrap:first-child {
+	white-space:nowrap;
+}
+
+.side_by_side_left{
+	float:left;
+}
+.side_by_side_right{
+	float:right;
+}
+
+#device{
+	display: inline-block;
+}
+.clear_block{
+	clear:both;
+}
+
+td.package{
+	background-color: #e0ddfa; /*purple*/
+}
+
+td.core{
+	background-color: #d1ddff; /*ccebff; /*blue*/
+}
+
+td.cpu{
+	background-color: #ffffeb; /* yellow */
+}
+
+th.title{
+	text-align: center;
+	/*border-bottom: 1px solid #666;*/
+}
+
+
+li.summary_list
+{
+	display: inline;
+	padding: 5px;
+	background-color: #f6f6f9;
+	font-size: 12px;
+}
+
+
+
+/* main menu css*/
+#main_menu {
+	clear:both;
 	font-weight: bold;
-	padding: 10px 0;
+	padding: 5px 0;
+	text-align: left;
+	background-image: -webkit-gradient(linear, left top, left bottom,
+		from(#aaa), to(#eee));
+	background: -moz-linear-gradient(top,  #aaa,  #eee);
+}
+
+
+#main_menu div {
+	font-size: 12px;
+	font-weight: bold;
+	color: white;
+}
+
+#main_menu div.nav_button {
+	margin: 0 0.2em;
+	display: inline;
+	cursor: pointer;
+	color: #223232;
+	font-size: 13px;
+	font-weight: bold;
+	padding: 5px;
 	text-align: center;
 	text-decoration: none;
-	text-shadow: 0px 1px 1px #fff;
-	background-image: -webkit-gradient(linear, left top, left bottom,
-						from(#ccc), to(#999));
 }
 
-
-#top div {
-	height: 30px;
-	font-weight: bold;
-	text-align: center;
-	color: white;
-	text-shadow: rgba(0,0,0,0.6) 0px -1px 1px;
-	line-height: 28px;
-	border-width:0px 8px 0px 8px;
-}
-#top div.SystemButton {
-	position: absolute;
-	top: 7px;
-	left: 6px;
-}
-#top div.SummaryButton {
-	position: absolute;
-	top: 7px;
-	left: 160px;
-}
-#top div.CpuidleButton {
-	position: absolute;
-	top: 7px;
-	left: 320px;
-}
-#top div.CpufreqButton {
-	position: absolute;
-	top: 7px;
-	left: 480px;
-}
-#top div.SoftwareButton {
-	position: absolute;
-	top: 7px;
-	left: 640px;
-}
-#top div.DeviceButton {
-	position: absolute;
-	top: 7px;
-	left: 800px;
-}
-#top div.TuningButton {
-	position: absolute;
-	top: 7px;
-	left: 960px;
-}
-#top div.AllButton {
-	position: absolute;
-	top: 7px;
-	left: 1120px;
-}
 div.pressed {
-	background-color: #000000;
-	border: 1px solid #000000;
-	color: #000000;
-	display: block;
+	border: -webkit-gradient(linear, left top, left bottom,
+		from(#b2ffb2), to(#e0ffe0));
 	border-width:0px 8px 0px 8px;
-	-webkit-border-top-left-radius: 8px;
-	-webkit-border-top-right-radius: 8px;
-	-webkit-border-bottom-left-radius: 8px;
-	-webkit-border-bottom-right-radius: 8px;
+	background: #999;
+	background-image: -webkit-gradient(linear, left top, left bottom,
+		from(#b2ffb2), to(#e0ffe0));
+	background: -moz-linear-gradient(top,  #b2ffb2,  #e0ffe0);
 }
-table.hide {
+
+div.hide {
 	display: none;
-}
-h2.hide {
-	display: none;
-}
-p.hide {
-	display: none
 }
 </style>
 </head>
 
-<body>
-
-<div id='top'>
-<h1><a href='#top'>&nbsp;</a></h1>
-</div>
-
+<body onload='powertop.onload();'>
+<div id=\"main_container\">

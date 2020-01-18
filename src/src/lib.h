@@ -27,16 +27,19 @@
 
 #include <libintl.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <cstring>
 
 /* Include only for Automake builds */
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+#ifdef ENABLE_NLS
 #define _(STRING)    gettext(STRING)
-
-#define POWERTOP_VERSION "v"PACKAGE_VERSION
-#define POWERTOP_SHORT_VERSION PACKAGE_VERSION
+#else
+#define _(STRING)    (STRING)
+#endif
 
 extern int is_turbo(uint64_t freq, uint64_t max, uint64_t maxmo);
 
@@ -70,9 +73,23 @@ extern char *fmt_prefix(double n, char *buf);
 extern char *pretty_print(const char *str, char *buf, int len);
 extern int equals(double a, double b);
 
+template<size_t N> void pt_strcpy(char (&d)[N], const char *s)
+{
+	strncpy(d, s, N);
+	d[N-1] = '\0';
+}
+
 typedef void (*callback)(const char*);
 extern void process_directory(const char *d_name, callback fn);
+extern void process_glob(const char *glob, callback fn);
 extern int utf_ok;
 extern int get_user_input(char *buf, unsigned sz);
+extern int read_msr(int cpu, uint64_t offset, uint64_t *value);
+extern int write_msr(int cpu, uint64_t offset, uint64_t value);
 
+extern void align_string(char *buffer, size_t min_sz, size_t max_sz);
+
+extern void ui_notify_user_ncurses(const char *frmt, ...);
+extern void ui_notify_user_console(const char *frmt, ...);
+extern void (*ui_notify_user) (const char *frmt, ...);
 #endif

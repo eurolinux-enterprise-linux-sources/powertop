@@ -30,6 +30,7 @@
 #include <math.h>
 #include <vector>
 #include <unistd.h>
+#include <limits.h>
 
 
 struct parameter_bundle all_parameters;
@@ -188,18 +189,14 @@ double compute_bundle(struct parameter_bundle *parameters, struct result_bundle 
 	if (!bpi)
 		bpi = get_param_index("base power");
 
-	power = parameters->parameters[bpi];
-
-	for (i = 0; i < all_devices.size(); i++) {
-
+	for (i = 0; i < all_devices.size(); i++)
 		power += all_devices[i]->power_usage(results, parameters);
-	}
-//	printf("result power is %6.2f  guessed is %6.2f\n", results->power, power);
+
 	parameters->actual_power = results->power;
 	parameters->guessed_power = power;
 	/* scale the squared error by the actual power so that non-idle data points weigh heavier */
 	parameters->score += results->power * (power - results->power) * (power - results->power);
-
+	parameters->parameters[bpi] = power;
 	return power;
 }
 
@@ -330,7 +327,7 @@ void store_results(double duration)
 {
 	if (duration < 5)
 		return;
-	global_joules_consumed();
+	global_power();
 	if (all_results.power > 0.01) {
 		unsigned int overflow_index;
 		overflow_index = 50 + (rand() % MAX_KEEP);
@@ -432,7 +429,7 @@ int utilization_power_valid(int index)
 
 /* force power data to be valid to the rest of the system  */
 int global_power_override = 0;
-
+int global_run_times=0;
 /*
  * only report power numbers once we have 3* more measurements than
  * we have parameters; anything less and our model fit is highly suspect
@@ -442,6 +439,11 @@ int global_power_valid(void)
 	if (past_results.size() > 3 * all_parameters.parameters.size())
 		return 1;
 
+	if (past_results.size() > 0 && global_run_times < 1){
+		printf("To show power estimates do %ld measurement(s) connected to battery only\n",
+			(3 * all_parameters.parameters.size()) - past_results.size());
+		global_run_times += 1; 
+	}
 
 	return global_power_override;
 }
@@ -449,12 +451,12 @@ int global_power_valid(void)
 /* find the directory to store powertop results/parameters based on distribution*/
 char* get_param_directory(const char *filename)
 {
-	static char tempfilename[4096];
+	static char tempfilename[PATH_MAX];
 
 	if (access("/var/cache/powertop", W_OK ) == 0)
-		sprintf(tempfilename, "/var/cache/powertop/%s", filename);
+		snprintf(tempfilename, sizeof(tempfilename), "/var/cache/powertop/%s", filename);
 	if (access("/data/local/powertop", W_OK ) == 0)
-		sprintf(tempfilename, "/data/local/powertop/%s", filename);
+		snprintf(tempfilename, sizeof(tempfilename), "/data/local/powertop/%s", filename);
 
 	return tempfilename;
 };

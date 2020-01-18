@@ -33,7 +33,8 @@
 #include <pthread.h>
 #include <math.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "../parameters/parameters.h"
 extern "C" {
@@ -85,45 +86,32 @@ static void restore_all_sysfs(void)
 	set_wifi_power_saving("wlan0", wireless_PS);
 }
 
+static void find_all_usb_callback(const char *d_name)
+{
+	char filename[PATH_MAX];
+	ifstream file;
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/power/active_duration", d_name);
+	if (access(filename, R_OK) != 0)
+		return;
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/power/idVendor", d_name);
+	file.open(filename, ios::in);
+	if (file) {
+		file.getline(filename, sizeof(filename));
+		file.close();
+		if (strcmp(filename, "1d6b") == 0)
+			return;
+	}
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/power/control", d_name);
+	save_sysfs(filename);
+	usb_devices.push_back(filename);
+}
+
 static void find_all_usb(void)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-
-	dir = opendir("/sys/bus/usb/devices/");
-	if (!dir)
-		return;
-	while (1) {
-		ifstream file;
-
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/bus/usb/devices/%s/power/active_duration", entry->d_name);
-		if (access(filename, R_OK)!=0)
-			continue;
-
-		sprintf(filename, "/sys/bus/usb/devices/%s/power/idVendor", entry->d_name);
-		file.open(filename, ios::in);
-		if (file) {
-			file.getline(filename, 4096);
-			file.close();
-			if (strcmp(filename, "1d6b")==0)
-				continue;
-		}
-
-		sprintf(filename, "/sys/bus/usb/devices/%s/power/control", entry->d_name);
-
-		save_sysfs(filename);
-
-		usb_devices.push_back(filename);
-	}
-	closedir(dir);
+	process_directory("/sys/bus/usb/devices/", find_all_usb_callback);
 }
 
 static void suspend_all_usb_devices(void)
@@ -134,33 +122,19 @@ static void suspend_all_usb_devices(void)
 		write_sysfs(usb_devices[i], "auto\n");
 }
 
+static void find_all_rfkill_callback(const char *d_name)
+{
+	char filename[PATH_MAX];
+	snprintf(filename, sizeof(filename), "/sys/class/rfkill/%s/soft", d_name);
+	if (access(filename, R_OK) != 0)
+		return;
+	save_sysfs(filename);
+	rfkill_devices.push_back(filename);
+}
 
 static void find_all_rfkill(void)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-
-	dir = opendir("/sys/class/rfkill/");
-	if (!dir)
-		return;
-	while (1) {
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/class/rfkill/%s/soft", entry->d_name);
-		if (access(filename, R_OK)!=0)
-			continue;
-
-		save_sysfs(filename);
-
-		rfkill_devices.push_back(filename);
-	}
-	closedir(dir);
+	process_directory("/sys/class/rfkill/", find_all_rfkill_callback);
 }
 
 static void rfkill_all_radios(void)
@@ -178,35 +152,22 @@ static void unrfkill_all_radios(void)
 		write_sysfs(rfkill_devices[i], "0\n");
 }
 
+static void find_backlight_callback(const char *d_name)
+{
+	char filename[PATH_MAX];
+	snprintf(filename, sizeof(filename), "/sys/class/backlight/%s/brightness", d_name);
+	if (access(filename, R_OK) != 0)
+		return;
+
+	save_sysfs(filename);
+	backlight_devices.push_back(filename);
+	snprintf(filename, sizeof(filename), "/sys/class/backlight/%s/max_brightness", d_name);
+	blmax = read_sysfs(filename);
+}
+
 static void find_backlight(void)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-
-	dir = opendir("/sys/class/backlight/");
-	if (!dir)
-		return;
-	while (1) {
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/class/backlight/%s/brightness", entry->d_name);
-		if (access(filename, R_OK)!=0)
-			continue;
-
-		save_sysfs(filename);
-
-		backlight_devices.push_back(filename);
-
-		sprintf(filename, "/sys/class/backlight/%s/max_brightness", entry->d_name);
-		blmax = read_sysfs(filename);
-	}
-	closedir(dir);
+	process_directory("/sys/class/backlight/", find_backlight_callback);
 }
 
 static void lower_backlight(void)
@@ -217,34 +178,20 @@ static void lower_backlight(void)
 		write_sysfs(backlight_devices[i], "0\n");
 }
 
+static void find_scsi_link_callback(const char *d_name)
+{
+	char filename[PATH_MAX];
+	snprintf(filename, sizeof(filename), "/sys/class/scsi_host/%s/link_power_management_policy", d_name);
+	if (access(filename, R_OK)!=0)
+		return;
+
+	save_sysfs(filename);
+	scsi_link_devices.push_back(filename);
+}
 
 static void find_scsi_link(void)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-
-	dir = opendir("/sys/class/scsi_host/");
-	if (!dir)
-		return;
-	while (1) {
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/class/scsi_host/%s/link_power_management_policy", entry->d_name);
-		if (access(filename, R_OK)!=0)
-			continue;
-
-		save_sysfs(filename);
-
-		scsi_link_devices.push_back(filename);
-
-	}
-	closedir(dir);
+	process_directory("/sys/class/scsi_host/", find_scsi_link_callback);
 }
 
 static void set_scsi_link(const char *state)
@@ -294,10 +241,11 @@ static void *burn_disk(void *dummy)
 
 	while (!stop_measurement) {
 		lseek(fd, 0, SEEK_SET);
-		write(fd, buffer, 64*1024);
+		if(write(fd, buffer, 64*1024) == -1)
+			printf("Error: %s\n", strerror(errno));
 		fdatasync(fd);
 	}
-	close(fd);
+	unlink(filename);
 	return NULL;
 }
 
@@ -313,7 +261,7 @@ static void cpu_calibration(int threads)
 	for (i = 0; i < threads; i++)
 		pthread_create(&thr, NULL, burn_cpu, NULL);
 
-	one_measurement(15, NULL);
+	one_measurement(15, 15, NULL);
 	stop_measurement = 1;
 	sleep(1);
 }
@@ -328,7 +276,7 @@ static void wakeup_calibration(unsigned long interval)
 
 	pthread_create(&thr, NULL, burn_cpu_wakeups, (void *)interval);
 
-	one_measurement(15, NULL);
+	one_measurement(15, 15, NULL);
 	stop_measurement = 1;
 	sleep(1);
 }
@@ -344,7 +292,7 @@ static void usb_calibration(void)
 		printf(_(".... device %s \n"), usb_devices[i].c_str());
 		suspend_all_usb_devices();
 		write_sysfs(usb_devices[i], "on\n");
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 		suspend_all_usb_devices();
 		sleep(3);
 	}
@@ -361,7 +309,7 @@ static void rfkill_calibration(void)
 		printf(_(".... device %s \n"), rfkill_devices[i].c_str());
 		rfkill_all_radios();
 		write_sysfs(rfkill_devices[i], "0\n");
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 		rfkill_all_radios();
 		sleep(3);
 	}
@@ -369,7 +317,7 @@ static void rfkill_calibration(void)
 		printf(_(".... device %s \n"), rfkill_devices[i].c_str());
 		unrfkill_all_radios();
 		write_sysfs(rfkill_devices[i], "1\n");
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 		unrfkill_all_radios();
 		sleep(3);
 	}
@@ -385,37 +333,41 @@ static void backlight_calibration(void)
 		char str[4096];
 		printf(_(".... device %s \n"), backlight_devices[i].c_str());
 		lower_backlight();
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 		sprintf(str, "%i\n", blmax / 4);
 		write_sysfs(backlight_devices[i], str);
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 
 		sprintf(str, "%i\n", blmax / 2);
 		write_sysfs(backlight_devices[i], str);
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 
 		sprintf(str, "%i\n", 3 * blmax / 4 );
 		write_sysfs(backlight_devices[i], str);
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 
 		sprintf(str, "%i\n", blmax);
 		write_sysfs(backlight_devices[i], str);
-		one_measurement(15, NULL);
+		one_measurement(15, 15, NULL);
 		lower_backlight();
 		sleep(1);
 	}
 	printf(_("Calibrating idle\n"));
-	system("DISPLAY=:0 /usr/bin/xset dpms force off");
-	one_measurement(15, NULL);
-	system("DISPLAY=:0 /usr/bin/xset dpms force on");
+	if(!system("DISPLAY=:0 /usr/bin/xset dpms force off"))
+		printf("System is not available\n");
+	one_measurement(15, 15, NULL);
+	if(!system("DISPLAY=:0 /usr/bin/xset dpms force on"))
+		printf("System is not available\n");
 }
 
 static void idle_calibration(void)
 {
 	printf(_("Calibrating idle\n"));
-	system("DISPLAY=:0 /usr/bin/xset dpms force off");
-	one_measurement(15, NULL);
-	system("DISPLAY=:0 /usr/bin/xset dpms force on");
+	if(!system("DISPLAY=:0 /usr/bin/xset dpms force off"))
+		printf("System is not available\n");
+	one_measurement(15, 15, NULL);
+	if(!system("DISPLAY=:0 /usr/bin/xset dpms force on"))
+		printf("System is not available\n");
 }
 
 
@@ -430,7 +382,7 @@ static void disk_calibration(void)
 	stop_measurement = 0;
 	pthread_create(&thr, NULL, burn_disk, NULL);
 
-	one_measurement(15, NULL);
+	one_measurement(15, 15, NULL);
 	stop_measurement = 1;
 	sleep(1);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Intel Corporation
+ * Copyright 2010, Intel Corporation
  *
  * This file is part of PowerTOP
  *
@@ -20,27 +20,38 @@
  * or just google for it.
  *
  * Authors:
- *	John Mathew <johnx.mathew@intel.com>
+ *	Srinivas Pandruvada <Srinivas.Pandruvada@linux.intel.com>
  */
-#ifndef __INCLUDE_GUARD_POWER_SUPPLY_H
-#define __INCLUDE_GUARD_POWER_SUPPLY_H
+#ifndef _INCLUDE_GUARD_CPU_RAPL_DEVICE_H
+#define _INCLUDE_GUARD_CPU_RAPL_DEVICE_H
 
-#include "measurement.h"
+#include <vector>
+#include <string>
 
-class power_supply:public power_meter {
-	char battery_name[256];
+using namespace std;
 
-	double capacity;
-	double rate;
-	double voltage;
-	void measure(void);
+#include <sys/time.h>
+#include "cpudevice.h"
+#include "rapl/rapl_interface.h"
+
+class cpu_rapl_device: public cpudevice {
+
+	c_rapl_interface *rapl;
+	time_t		last_time;
+	double		last_energy;
+	double 		consumed_power;
+	bool		device_valid;
+
 public:
-	power_supply(const char *_battery_name);
+	cpu_rapl_device(cpudevice *parent, const char *classname = "cpu_core", const char *device_name = "cpu_core", class abstract_cpu *_cpu = NULL);
+	~cpu_rapl_device() { delete rapl; }
+	virtual const char * device_name(void) {return "CPU core";};
+	bool device_present() { return device_valid;}
+	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
 	virtual void start_measurement(void);
 	virtual void end_measurement(void);
 
-	virtual double joules_consumed(void);
-	virtual double dev_capacity(void) { return capacity; };
 };
+
 
 #endif

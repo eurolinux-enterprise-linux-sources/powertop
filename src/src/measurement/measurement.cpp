@@ -25,8 +25,8 @@
 #include "measurement.h"
 #include "acpi.h"
 #include "extech.h"
-#include "power_supply.h"
 #include "sysfs.h"
+#include "opal-sensors.h"
 #include "../parameters/parameters.h"
 #include "../lib.h"
 
@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <unistd.h>
+#include <time.h>
 
 double min_power = 50000.0;
 
@@ -49,35 +50,22 @@ void power_meter::end_measurement(void)
 }
 
 
-double power_meter::joules_consumed(void)
+double power_meter::power(void)
 {
 	return 0.0;
 }
 
-double power_meter::time_left(void)
-{
-	double cap, rate;
-
-	cap = dev_capacity();
-	rate = joules_consumed();
-
-	if (cap < 0.001)
-		return 0.0;
-
-	/* return 0.0 instead of INF+ */
-	if (rate < 0.001)
-		return 0.0;
-
-	return cap / rate;
-}
-
 vector<class power_meter *> power_meters;
+
+static struct timespec tlast;
 
 void start_power_measurement(void)
 {
 	unsigned int i;
+	clock_gettime(CLOCK_REALTIME, &tlast);
 	for (i = 0; i < power_meters.size(); i++)
 		power_meters[i]->start_measurement();
+	all_results.joules = 0.0;
 }
 void end_power_measurement(void)
 {
@@ -86,12 +74,20 @@ void end_power_measurement(void)
 		power_meters[i]->end_measurement();
 }
 
-double global_joules_consumed(void)
+double global_power(void)
 {
+	bool global_discharging = false;
 	double total = 0.0;
 	unsigned int i;
-	for (i = 0; i < power_meters.size(); i++)
-		total += power_meters[i]->joules_consumed();
+
+	for (i = 0; i < power_meters.size(); i++) {
+		global_discharging |= power_meters[i]->is_discharging();
+		total += power_meters[i]->power();
+	}
+
+	/* report global time left if at least one battery is discharging */
+	if (!global_discharging)
+		return 0.0;
 
 	all_results.power = total;
 	if (total < min_power && total > 0.01)
@@ -99,15 +95,38 @@ double global_joules_consumed(void)
 	return total;
 }
 
+void global_sample_power(void)
+{
+	struct timespec tnow;
+
+	clock_gettime(CLOCK_REALTIME, &tnow);
+	/* power * time = joules */
+	all_results.joules += global_power() * \
+			 ( ((double)tnow.tv_sec + 1.0e-9*tnow.tv_nsec) - \
+			   ((double)tlast.tv_sec + 1.0e-9*tlast.tv_nsec));
+	tlast = tnow;
+}
+
+double global_joules(void)
+{
+	return all_results.joules;
+}
+
 double global_time_left(void)
 {
+	bool global_discharging = false;
 	double total_capacity = 0.0;
 	double total_rate = 0.0;
 	unsigned int i;
 	for (i = 0; i < power_meters.size(); i++) {
+		global_discharging |= power_meters[i]->is_discharging();
 		total_capacity += power_meters[i]->dev_capacity();
-		total_rate += power_meters[i]->joules_consumed();
+		total_rate += power_meters[i]->power();
 	}
+	/* report global time left if at least one battery is discharging */
+	if (!global_discharging)
+		return 0.0;
+
 	/* return 0.0 instead of INF+ */
 	if (total_rate < 0.001)
 		return 0.0;
@@ -135,38 +154,25 @@ void acpi_power_meters_callback(const char *d_name)
 		power_meters.push_back(meter);
 }
 
-void power_supply_callback(const char *d_name)
+void sysfs_opal_sensors_callback(const char *d_name)
 {
-	char filename[4096];
-	char line[4096];
-	ifstream file;
-	bool discharging = false;
+	class opal_sensors_power_meter *meter;
+	const char *c;
 
-	sprintf(filename, "/sys/class/power_supply/%s/uevent", d_name);
-	file.open(filename, ios::in);
-	if (!file)
+	/* Those that end in / are directories and we don't want them */
+	c = strrchr(d_name, '/');
+	if (c && *(c+1) == '\0')
 		return;
 
-	while (file) {
-		file.getline(line, 4096);
-
-		if (strstr(line, "POWER_SUPPLY_STATUS") && strstr(line, "Discharging"))
-		      discharging = true;
-	}
-	file.close();
-
-	if (!discharging)
-	    return;
-
-	class power_supply *power;
-	power = new(std::nothrow) class power_supply(d_name);
-	if (power)
-		power_meters.push_back(power);
+	meter = new(std::nothrow) class opal_sensors_power_meter(d_name);
+	if (meter)
+		power_meters.push_back(meter);
 }
 
 void detect_power_meters(void)
 {
 	process_directory("/sys/class/power_supply", sysfs_power_meters_callback);
+	process_glob("/sys/devices/platform/opal-sensor/hwmon/hwmon*/power*", sysfs_opal_sensors_callback);
 	if (power_meters.size() == 0) {
 		process_directory("/proc/acpi/battery", acpi_power_meters_callback);
 	}

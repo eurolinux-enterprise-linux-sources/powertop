@@ -1,5 +1,5 @@
 /*
- * Copyright 2010, Intel Corporation
+ * Copyright (c) 2015 IBM Corp.
  *
  * This file is part of PowerTOP
  *
@@ -20,31 +20,23 @@
  * or just google for it.
  *
  * Authors:
- *	Arjan van de Ven <arjan@linux.intel.com>
+ *	Stewart Smith <stewart@linux.vnet.ibm.com>
  */
-#ifndef _INCLUDE_GUARD_CPUFREQ_TUNE_H
-#define _INCLUDE_GUARD_CPUFREQ_TUNE_H
+#ifndef INCLUDE_GUARD_OPAL_SENSORS_H
+#define INCLUDE_GUARD_OPAL_SENSORS_H
 
-#include <vector>
+#include "measurement.h"
+#include <limits.h>
 
-#include "tunable.h"
-
-using namespace std;
-
-class cpufreq_tunable : public tunable {
-	char original[4096];
+class opal_sensors_power_meter: public power_meter {
+	char name[PATH_MAX];
 public:
-	cpufreq_tunable(void);
+	opal_sensors_power_meter(const char *power_supply_name);
+	virtual void start_measurement(void) {};
+	virtual void end_measurement(void) {};
 
-	virtual int good_bad(void);
-
-	virtual void toggle(void);
-
-	virtual const char *toggle_script(void);
-
+	virtual double power(void);
+	virtual double dev_capacity(void) { return 0.0; }
 };
-
-extern void add_cpufreq_tunable(void);
-
 
 #endif

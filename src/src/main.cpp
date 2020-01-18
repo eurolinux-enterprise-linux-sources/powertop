@@ -28,6 +28,7 @@
  *	Arjan van de Ven <arjan@linux.intel.com>
  */
 #include <iostream>
+#include <fstream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -36,6 +37,8 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <locale.h>
+#include <sys/resource.h>
+#include <limits.h>
 
 #include "cpu/cpu.h"
 #include "process/process.h"
@@ -46,7 +49,9 @@
 
 
 #include "devices/device.h"
+#include "devices/devfreq.h"
 #include "devices/usb.h"
+#include "devices/ahci.h"
 #include "measurement/measurement.h"
 #include "parameters/parameters.h"
 #include "calibrate/calibrate.h"
@@ -60,30 +65,41 @@
 
 #define DEBUGFS_MAGIC          0x64626720
 
+#define NR_OPEN_DEF 1024 * 1024
+
 int debug_learning = 0;
 unsigned time_out = 20;
 int leave_powertop = 0;
+void (*ui_notify_user) (const char *frmt, ...);
+
+enum {
+	OPT_AUTO_TUNE = CHAR_MAX + 1,
+	OPT_EXTECH,
+	OPT_DEBUG
+};
 
 static const struct option long_options[] =
 {
 	/* These options set a flag. */
-	{"debug", no_argument, &debug_learning, 'd'},
-	{"version", no_argument, NULL, 'V'},
-	{"help",no_argument, NULL, 'u'}, /* u for usage */
-	{"calibrate",no_argument, NULL, 'c'},
-	{"html", optional_argument, NULL, 'h'},
-	{"csv", optional_argument, NULL, 'C'},
-	{"extech", optional_argument, NULL, 'e'},
-	{"time", optional_argument, NULL, 't'},
-	{"iteration", optional_argument, NULL, 'i'},
-	{"workload", optional_argument, NULL, 'w'},
-	{"quiet", no_argument, NULL, 'q'},
-	{NULL, 0, NULL, 0}
+	{"auto-tune",	no_argument,		NULL,		 OPT_AUTO_TUNE},
+	{"calibrate",	no_argument,		NULL,		 'c'},
+	{"csv",		optional_argument,	NULL,		 'C'},
+	{"debug",	no_argument,		&debug_learning, OPT_DEBUG},
+	{"extech",	optional_argument,	NULL,		 OPT_EXTECH},
+	{"html",	optional_argument,	NULL,		 'r'},
+	{"iteration",	optional_argument,	NULL,		 'i'},
+	{"quiet",	no_argument,		NULL,		 'q'},
+	{"sample",	optional_argument,	NULL,		 's'},
+	{"time",	optional_argument,	NULL,		 't'},
+	{"workload",	optional_argument,	NULL,		 'w'},
+	{"version",	no_argument,		NULL,		 'V'},
+	{"help",	no_argument,		NULL,		 'h'},
+	{NULL,		0,			NULL,		 0}
 };
 
 static void print_version()
 {
-	printf(_("PowerTOP version" POWERTOP_VERSION ", compiled on " __DATE__ "\n"));
+	printf(_("PowerTOP version " PACKAGE_VERSION "\n"));
 }
 
 static bool set_refresh_timeout()
@@ -102,20 +118,22 @@ static bool set_refresh_timeout()
 
 static void print_usage()
 {
-	printf("%s\n\n",_("Usage: powertop [OPTIONS]"));
-	printf("--debug \t\t %s\n",_("run in \"debug\" mode"));
-	printf("--version \t\t %s\n",_("print version information"));
-	printf("--calibrate \t\t %s\n",_("runs powertop in calibration mode"));
-	printf("--extech%s \t %s\n",_("[=devnode]"),_("uses an Extech Power Analyzer for measurements"));
-	printf("--html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
-	printf("--csv%s \t %s\n",_("[=FILENAME]"),_("generate a csv report"));
-	printf("--time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
-	printf("--iteration%s\n", _("[=iterations] number of times to run each test"));
-	printf("--workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
-	printf("--quiet \t\t %s\n", _("suppress stderr output"));
-	printf("--help \t\t\t %s\n",_("print this help menu"));
+	printf("%s\n\n", _("Usage: powertop [OPTIONS]"));
+	printf("     --auto-tune\t %s\n", _("sets all tunable options to their GOOD setting"));
+	printf(" -c, --calibrate\t %s\n", _("runs powertop in calibration mode"));
+	printf(" -C, --csv%s\t %s\n", _("[=filename]"), _("generate a csv report"));
+	printf("     --debug\t\t %s\n", _("run in \"debug\" mode"));
+	printf("     --extech%s\t %s\n", _("[=devnode]"), _("uses an Extech Power Analyzer for measurements"));
+	printf(" -r, --html%s\t %s\n", _("[=filename]"), _("generate a html report"));
+	printf(" -i, --iteration%s\n", _("[=iterations] number of times to run each test"));
+	printf(" -q, --quiet\t\t %s\n", _("suppress stderr output"));
+	printf(" -s, --sample%s\t %s\n", _("[=seconds]"), _("interval for power consumption measurement"));
+	printf(" -t, --time%s\t %s\n", _("[=seconds]"), _("generate a report for 'x' seconds"));
+	printf(" -w, --workload%s %s\n", _("[=workload]"), _("file to execute for workload"));
+	printf(" -V, --version\t\t %s\n", _("print version information"));
+	printf(" -h, --help\t\t %s\n", _("print this help menu"));
 	printf("\n");
-	printf("%s\n\n",_("For more help please refer to the README"));
+	printf("%s\n\n", _("For more help please refer to the 'man 8 powertop'"));
 }
 
 static void do_sleep(int seconds)
@@ -136,10 +154,10 @@ static void do_sleep(int seconds)
 
 		c = getch();
 		switch (c) {
-		case 353: 
+		case KEY_BTAB:
 			show_prev_tab();
 			break;
-		case 9:
+		case '\t':
 			show_next_tab(); 
 			break;
 		case KEY_RIGHT:
@@ -156,8 +174,8 @@ static void do_sleep(int seconds)
 		case KEY_UP:
 			cursor_up();
 			break;
-		case 32:
-		case 10:
+		case ' ':
+		case '\n':
 			cursor_enter();
 			break;
 		case 's':
@@ -169,7 +187,7 @@ static void do_sleep(int seconds)
 			return;
 		case KEY_EXIT:
 		case 'q':
-		case 27:
+		case 27:	// Escape
 			leave_powertop = 1;
 			return;
 		}
@@ -181,24 +199,55 @@ static void do_sleep(int seconds)
 	} while (1);
 }
 
+extern "C" {
+	static volatile bool end_thread;
+	void* measure_background_thread(void *arg)
+	{
+		int sleep_time = *((int *) arg);
+		while (!end_thread) {
+			do_sleep(sleep_time);
+			global_sample_power();
+		}
+		return 0;
+	}
+}
 
-void one_measurement(int seconds, char *workload)
+void one_measurement(int seconds, int sample_interval, char *workload)
 {
 	create_all_usb_devices();
 	start_power_measurement();
 	devices_start_measurement();
+	start_devfreq_measurement();
 	start_process_measurement();
 	start_cpu_measurement();
 
 	if (workload && workload[0]) {
+		pthread_t thread = 0UL;
+		end_thread = false;
+		if (pthread_create(&thread, NULL, measure_background_thread, &sample_interval))
+			fprintf(stderr, "ERROR: workload measurement thread creation failed\n");
+
 		if (system(workload))
 			fprintf(stderr, _("Unknown issue running workload!\n"));
+
+		if (thread)
+		{
+			end_thread = true;
+			pthread_join( thread, NULL);
+		}
+		global_sample_power();
 	} else {
-		do_sleep(seconds);
+		while (seconds > 0)
+		{
+			do_sleep(sample_interval > seconds ? seconds : sample_interval);
+			seconds -= sample_interval;
+			global_sample_power();
+		}
 	}
 	end_cpu_measurement();
 	end_process_measurement();
 	collect_open_devices();
+	end_devfreq_measurement();
 	devices_end_measurement();
 	end_power_measurement();
 
@@ -210,22 +259,25 @@ void one_measurement(int seconds, char *workload)
 	report_summary();
 	w_display_cpu_cstates();
 	w_display_cpu_pstates();
-	report_display_cpu_cstates();
-	report_display_cpu_pstates();
+	if (reporttype != REPORT_OFF) {
+		report_display_cpu_cstates();
+		report_display_cpu_pstates();
+	}
 	report_process_update_display();
-
 	tuning_update_display();
 
 	end_process_data();
 
-	global_joules_consumed();
+	global_power();
 	compute_bundle();
 
 	show_report_devices();
 	report_show_open_devices();
 
 	report_devices();
-
+	display_devfreq_devices();
+	report_devfreq_devices();
+	ahci_create_device_stats_table();
 	store_results(measurement_time);
 	end_cpu_data();
 }
@@ -237,13 +289,13 @@ void out_of_memory()
 	abort();
 }
 
-void make_report(int time, char *workload, int iterations, char *file)
+void make_report(int time, char *workload, int iterations, int sample_interval, char *file)
 {
 
 	/* one to warm up everything */
 	fprintf(stderr, _("Preparing to take measurements\n"));
 	utf_ok = 0;
-	one_measurement(1, NULL);
+	one_measurement(1, sample_interval, NULL);
 
 	if (!workload[0])
 	  fprintf(stderr, _("Taking %d measurement(s) for a duration of %d second(s) each.\n"),iterations,time);
@@ -253,7 +305,7 @@ void make_report(int time, char *workload, int iterations, char *file)
 		init_report_output(file, iterations);
 		initialize_tuning();
 		/* and then the real measurement */
-		one_measurement(time, workload);
+		one_measurement(time, sample_interval, workload);
 		report_show_tunables();
 		finish_report_output();
 		clear_tuning();
@@ -271,25 +323,46 @@ static void checkroot() {
 	uid = getuid();
 
 	if (uid != 0) {
-		printf(_("PowerTOP " POWERTOP_VERSION " must be run with root privileges.\n"));
+		printf(_("PowerTOP " PACKAGE_VERSION " must be run with root privileges.\n"));
 		printf(_("exiting...\n"));
 		exit(EXIT_FAILURE);
 	}
 
 }
 
-static void powertop_init(void)
+static int get_nr_open(void) {
+	int nr_open = NR_OPEN_DEF;
+	ifstream file;
+
+	file.open("/proc/sys/fs/nr_open", ios::in);
+	if (file) {
+		file >> nr_open;
+		file.close();
+	}
+	return nr_open;
+}
+
+static void powertop_init(int auto_tune)
 {
 	static char initialized = 0;
 	int ret;
 	struct statfs st_fs;
+	struct rlimit rlmt;
 
 	if (initialized)
 		return;
 
 	checkroot();
-	ret = system("/sbin/modprobe cpufreq_stats > /dev/null 2>&1");
-	ret = system("/sbin/modprobe msr > /dev/null 2>&1");
+
+	rlmt.rlim_cur = rlmt.rlim_max = get_nr_open();
+	setrlimit (RLIMIT_NOFILE, &rlmt);
+
+	if (system("/sbin/modprobe cpufreq_stats > /dev/null 2>&1"))
+		fprintf(stderr, _("modprobe cpufreq_stats failed"));
+#if defined(__i386__) || defined(__x86_64__)
+	if (system("/sbin/modprobe msr > /dev/null 2>&1"))
+		fprintf(stderr, _("modprobe msr failed"));
+#endif
 	statfs("/sys/kernel/debug", &st_fs);
 
 	if (st_fs.f_type != (long) DEBUGFS_MAGIC) {
@@ -299,9 +372,14 @@ static void powertop_init(void)
 			ret = system("mount -t debugfs debugfs /sys/kernel/debug > /dev/null 2>&1");
 		}
 		if (ret != 0) {
-			printf(_("Failed to mount debugfs!\n"));
-			printf(_("exiting...\n"));
-			exit(EXIT_FAILURE);
+			if (!auto_tune) {
+				fprintf(stderr, _("Failed to mount debugfs!\n"));
+				fprintf(stderr, _("exiting...\n"));
+				exit(EXIT_FAILURE);
+			} else {
+				fprintf(stderr, _("Failed to mount debugfs!\n"));
+				fprintf(stderr, _("Should still be able to auto tune...\n"));
+			}
 		}
 	}
 
@@ -317,6 +395,7 @@ static void powertop_init(void)
 
 	enumerate_cpus();
 	create_all_devices();
+	create_all_devfreq_devices();
 	detect_power_meters();
 
 	register_parameter("base power", 100, 0.5);
@@ -332,83 +411,110 @@ static void powertop_init(void)
 	initialized = 1;
 }
 
+void clean_shutdown()
+{
+	close_results();
+	clean_open_devices();
+	clear_all_devices();
+	clear_all_devfreq();
+	clear_all_cpus();
+
+	return;
+}
+
 
 int main(int argc, char **argv)
 {
 	int option_index;
 	int c;
-	char filename[4096];
-	char workload[4096] = {0,};
-	int  iterations = 1;
+	char filename[PATH_MAX];
+	char workload[PATH_MAX] = {0};
+	int  iterations = 1, auto_tune = 0, sample_interval = 5;
 
 	set_new_handler(out_of_memory);
 
 	setlocale (LC_ALL, "");
+
+#ifdef ENABLE_NLS
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
-
+#endif
+	ui_notify_user = ui_notify_user_ncurses;
 	while (1) { /* parse commandline options */
-		c = getopt_long (argc, argv, "ch:C:i:t:uVw:q", long_options, &option_index);
+		c = getopt_long(argc, argv, "cC:r:i:qt:w:Vh", long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
-
 		switch (c) {
-			case 'V':
-				print_version();
-				exit(0);
-				break;
-
-			case 'e': /* Extech power analyzer support */
-				checkroot();
-				extech_power_meter(optarg ? optarg : "/dev/ttyUSB0");
-				break;
-			case 'u':
-				print_usage();
-				exit(0);
-				break;
-
-			case 'c':
-				powertop_init();
-				calibrate();
-				break;
-
-			case 'h': /* html report */
-				reporttype = REPORT_HTML;
-				sprintf(filename, "%s", optarg ? optarg : "powertop.html" );
-				break;
-
-			case 't':
-				time_out = (optarg ? atoi(optarg) : 20);
-				break;
-
-			case 'i':
-				iterations = (optarg ? atoi(optarg) : 1);
-				break;
-
-			case 'w': /* measure workload */
-				sprintf(workload, "%s", optarg ? optarg :'\0' );
-				break;
-			case 'q':
-				if(freopen("/dev/null", "a", stderr))
-					fprintf(stderr, _("Quite mode failed!\n"));
-				break;
-
-			case 'C': /* csv report*/
-				reporttype = REPORT_CSV;
-				sprintf(filename, "%s", optarg ? optarg : "powertop.csv");
-				break;
-			case '?': /* Unknown option */
-				/* getopt_long already printed an error message. */
-				exit(0);
-				break;
+		case OPT_AUTO_TUNE:
+			auto_tune = 1;
+			leave_powertop = 1;
+			ui_notify_user = ui_notify_user_console;
+			break;
+		case 'c':
+			powertop_init(0);
+			calibrate();
+			break;
+		case 'C':		/* csv report */
+			reporttype = REPORT_CSV;
+			snprintf(filename, sizeof(filename), "%s", optarg ? optarg : "powertop.csv");
+			if (!strlen(filename))
+			{
+				fprintf(stderr, _("Invalid CSV filename\n"));
+				exit(1);
+			}
+			break;
+		case OPT_DEBUG:
+			/* implemented using getopt_long(3) flag */
+			break;
+		case OPT_EXTECH:	/* Extech power analyzer support */
+			checkroot();
+			extech_power_meter(optarg ? optarg : "/dev/ttyUSB0");
+			break;
+		case 'r':		/* html report */
+			reporttype = REPORT_HTML;
+			snprintf(filename, sizeof(filename), "%s", optarg ? optarg : "powertop.html");
+			if (!strlen(filename))
+			{
+				fprintf(stderr, _("Invalid HTML filename\n"));
+				exit(1);
+			}
+			break;
+		case 'i':
+			iterations = (optarg ? atoi(optarg) : 1);
+			break;
+		case 'q':
+			if (freopen("/dev/null", "a", stderr))
+				fprintf(stderr, _("Quiet mode failed!\n"));
+			break;
+		case 's':
+			sample_interval = (optarg ? atoi(optarg) : 5);
+			break;
+		case 't':
+			time_out = (optarg ? atoi(optarg) : 20);
+			break;
+		case 'w':		/* measure workload */
+			snprintf(workload, sizeof(workload), "%s", optarg ? optarg : "");
+			break;
+		case 'V':
+			print_version();
+			exit(0);
+			break;
+		case 'h':
+			print_usage();
+			exit(0);
+			break;
+		case '?':		/* Unknown option */
+			/* getopt_long already printed an error message. */
+			exit(1);
+			break;
 		}
 	}
 
-	powertop_init();
+	powertop_init(auto_tune);
 
 	if (reporttype != REPORT_OFF)
-		make_report(time_out, workload, iterations, filename);
+		make_report(time_out, workload, iterations, sample_interval, filename);
 
 	if (debug_learning)
 		printf("Learning debugging enabled\n");
@@ -423,21 +529,30 @@ int main(int argc, char **argv)
 		end_pci_access();
 		exit(0);
 	}
+	if (!auto_tune)
+		init_display();
 
-	/* first one is short to not let the user wait too long */
-	init_display();
-	one_measurement(1, NULL);
+	initialize_devfreq();
 	initialize_tuning();
-	tuning_update_display();
-	show_tab(0);
+	/* first one is short to not let the user wait too long */
+	one_measurement(1, sample_interval, NULL);
+
+	if (!auto_tune) {
+		tuning_update_display();
+		show_tab(0);
+	} else {
+		auto_toggle_tuning();
+	}
 
 	while (!leave_powertop) {
-		show_cur_tab();
-		one_measurement(time_out, NULL);
+		if (!auto_tune)
+			show_cur_tab();
+		one_measurement(time_out, sample_interval, NULL);
 		learn_parameters(15, 0);
 	}
-	endwin();
-	printf("%s\n", _("Leaving PowerTOP"));
+	if (!auto_tune)
+		endwin();
+	fprintf(stderr, "%s\n", _("Leaving PowerTOP"));
 
 	end_process_data();
 	clear_process_data();
@@ -452,8 +567,7 @@ int main(int argc, char **argv)
 	clear_tuning();
 	reset_display();
 
-	clear_all_devices();
-	clear_all_cpus();
+	clean_shutdown();
 
 	return 0;
 }

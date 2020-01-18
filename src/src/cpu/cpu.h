@@ -86,6 +86,7 @@ protected:
 
 	virtual void	account_freq(uint64_t frequency, uint64_t duration);
 	virtual void	freq_updated(uint64_t time);
+
 public:
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
@@ -100,11 +101,12 @@ public:
 	vector<struct idle_state *> cstates;
 	vector<struct frequency *> pstates;
 
-	virtual ~abstract_cpu() {};
+	virtual ~abstract_cpu();
 
 	class abstract_cpu *parent;
 
 
+	int	get_first_cpu() { return first_cpu; }
 	void	set_number(int _number, int cpu) {this->number = _number; this->first_cpu = cpu;};
 	void	set_type(const char* _name) {this->name = _name;};
 	int	get_number(void) { return number; };

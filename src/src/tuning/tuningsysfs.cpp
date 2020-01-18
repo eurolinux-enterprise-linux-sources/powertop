@@ -37,17 +37,18 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <limits.h>
 
 
 #include "../lib.h"
 
 sysfs_tunable::sysfs_tunable(const char *str, const char *_sysfs_path, const char *_target_content) : tunable(str, 1.0, _("Good"), _("Bad"), _("Unknown"))
 {
-	strcpy(sysfs_path, _sysfs_path);
-	strcpy(target_value, _target_content);
+	pt_strcpy(sysfs_path, _sysfs_path);
+	pt_strcpy(target_value, _target_content);
 	bad_value[0] = 0;
-	sprintf(toggle_good, "echo '%s' > '%s';", target_value, sysfs_path);
-	sprintf(toggle_bad, "echo '%s' > '%s';", bad_value, sysfs_path);
+	snprintf(toggle_good, sizeof(toggle_good), "echo '%s' > '%s';", target_value, sysfs_path);
+	snprintf(toggle_bad, sizeof(toggle_bad), "echo '%s' > '%s';", bad_value, sysfs_path);
 }
 
 int sysfs_tunable::good_bad(void)
@@ -68,7 +69,7 @@ int sysfs_tunable::good_bad(void)
 	if (strcmp(current_value, target_value) == 0)
 		return TUNE_GOOD;
 
-	strcpy(bad_value, current_value);
+	pt_strcpy(bad_value, current_value);
 	return TUNE_BAD;
 }
 
@@ -113,34 +114,17 @@ void add_sysfs_tunable(const char *str, const char *_sysfs_path, const char *_ta
 	all_tunables.push_back(tunable);
 }
 
-void add_sata_tunables(void)
+static void add_sata_tunables_callback(const char *d_name)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
+	char filename[PATH_MAX];
 	char msg[4096];
 
-	dir = opendir("/sys/class/scsi_host");
+	snprintf(filename, sizeof(filename), "/sys/class/scsi_host/%s/link_power_management_policy", d_name);
+	snprintf(msg, sizeof(msg), _("Enable SATA link power management for %s"), d_name);
+	add_sysfs_tunable(msg, filename,"min_power");
+}
 
-	if (!dir)
-		return;
-
-        while (1) {
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/class/scsi_host/%s/link_power_management_policy", entry->d_name);
-
-	        sprintf(msg, _("Enable SATA link power Managmenet for %s"),entry->d_name);
-
-		add_sysfs_tunable(msg, filename,"min_power");
-
-        }
-
-        closedir(dir);
+void add_sata_tunables(void)
+{
+	process_directory("/sys/class/scsi_host", add_sata_tunables_callback);
 }

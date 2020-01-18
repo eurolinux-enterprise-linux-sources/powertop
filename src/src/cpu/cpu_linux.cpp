@@ -46,7 +46,7 @@ void cpu_linux::parse_cstates_start(void)
 	char filename[256];
 	int len;
 
-	len = sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpuidle", number);
+	len = snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpuidle", number);
 
 	dir = opendir(filename);
 	if (!dir)
@@ -64,28 +64,29 @@ void cpu_linux::parse_cstates_start(void)
 		if (strlen(entry->d_name) < 3)
 			continue;
 
-		strcpy(linux_name, entry->d_name);
-		strcpy(human_name, linux_name);
+		pt_strcpy(linux_name, entry->d_name);
+		pt_strcpy(human_name, linux_name);
 
-		sprintf(filename + len, "/%s/name", entry->d_name);
+		snprintf(filename + len, sizeof(filename) - len, "/%s/name", entry->d_name);
 
 		file.open(filename, ios::in);
 		if (file) {
-			file.getline(human_name, 64);
+			file.getline(human_name, sizeof(human_name));
 			file.close();
 		}
 
 		if (strcmp(human_name, "C0")==0)
-			strcpy(human_name, _("C0 polling"));
+			pt_strcpy(human_name, _("C0 polling"));
 
-		sprintf(filename + len, "/%s/usage", entry->d_name);
+		snprintf(filename + len, sizeof(filename) - len, "/%s/usage", entry->d_name);
 		file.open(filename, ios::in);
 		if (file) {
 			file >> usage;
 			file.close();
-		}
+		} else
+			continue;
 
-		sprintf(filename + len, "/%s/time", entry->d_name);
+		snprintf(filename + len, sizeof(filename) - len, "/%s/time", entry->d_name);
 
 		file.open(filename, ios::in);
 		if (file) {
@@ -112,7 +113,7 @@ void cpu_linux::parse_pstates_start(void)
 		if (children[i])
 			children[i]->wiggle();
 
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/stats/time_in_state", first_cpu);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/stats/time_in_state", first_cpu);
 
 	file.open(filename, ios::in);
 
@@ -121,7 +122,7 @@ void cpu_linux::parse_pstates_start(void)
 
 		while (file) {
 			uint64_t f;
-			file.getline(line, 1024);
+			file.getline(line, sizeof(line));
 			f = strtoull(line, NULL, 10);
 			account_freq(f, 0);
 		}
@@ -145,7 +146,7 @@ void cpu_linux::parse_cstates_end(void)
 	ifstream file;
 	int len;
 
-	len = sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpuidle", number);
+	len = snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpuidle", number);
 
 	dir = opendir(filename);
 	if (!dir)
@@ -163,18 +164,19 @@ void cpu_linux::parse_cstates_end(void)
 		if (strlen(entry->d_name) < 3)
 			continue;
 
-		strcpy(linux_name, entry->d_name);
-		strcpy(human_name, linux_name);
+		pt_strcpy(linux_name, entry->d_name);
+		pt_strcpy(human_name, linux_name);
 
 
-		sprintf(filename + len, "/%s/usage", entry->d_name);
+		snprintf(filename + len, sizeof(filename) - len, "/%s/usage", entry->d_name);
 		file.open(filename, ios::in);
 		if (file) {
 			file >> usage;
 			file.close();
-		}
+		} else
+			continue;
 
-		sprintf(filename + len, "/%s/time", entry->d_name);
+		snprintf(filename + len, sizeof(filename) - len, "/%s/time", entry->d_name);
 
 		file.open(filename, ios::in);
 		if (file) {
@@ -194,7 +196,7 @@ void cpu_linux::parse_pstates_end(void)
 	char filename[256];
 	ifstream file;
 
-	sprintf(filename, "/sys/devices/system/cpu/cpu%i/cpufreq/stats/time_in_state", number);
+	snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%i/cpufreq/stats/time_in_state", number);
 
 	file.open(filename, ios::in);
 
@@ -205,9 +207,9 @@ void cpu_linux::parse_pstates_end(void)
 			uint64_t f,count;
 			char *c;
 
-			memset(line, 0, 1024);
+			memset(line, 0, sizeof(line));
 
-			file.getline(line, 1024);
+			file.getline(line, sizeof(line));
 
 			f = strtoull(line, &c, 10);
 			if (!c)

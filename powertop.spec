@@ -1,59 +1,46 @@
 Name:           powertop
-Version:        2.3
-Release:        9%{?dist}
+Version:        2.9
+Release:        1%{?dist}
 Summary:        Power consumption monitor
 
 Group:          Applications/System
 License:        GPLv2
 URL:            http://01.org/powertop/
-Source0:        http://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
+Source0:        http://01.org/sites/default/files/downloads/powertop/%{name}-v%{version}.tar.gz
 Source1:        powertop.service
 
 # Sent upstream
-Patch0:         powertop-2.3-always-create-params.patch
-# Sent upstream (http://github.com/fenrus75/powertop/pull/11)
-Patch1:         powertop-2.3-man-fix.patch
-# Sent upstream (http://github.com/fenrus75/powertop/pull/12)
-Patch2:         powertop-2.3-ondemand-check.patch
-# Accepted upstream
-Patch3:         powertop-2.3-unlimit-fds.patch
-# Accepted upstream
-Patch4:         powertop-2.3-fd-limit-err.patch
-# Sent upstream
-Patch5:         powertop-2.3-reg-net-params.patch
-Patch6:         powertop-2.3-tunable-overflow-fix.patch
-# Reported upstream, but upstream powertop needs different patch
-Patch7:         powertop-2.3-msr-check.patch
-# Backported from upstream
-Patch8:         powertop-2.3-auto-tune.patch
-# Sent upstream
-Patch9:         powertop-2.3-improve-reporting.patch
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-BuildRequires:  gettext, ncurses-devel, pciutils-devel, zlib-devel, libnl3-devel
-BuildRequires:  systemd
-Requires(post): systemd, coreutils
-Requires(preun): systemd
+Patch0:           powertop-2.7-always-create-params.patch
+Patch1:           powertop-2.9-cstates-rewrite-fix.patch
+Patch2:           powertop-2.9-intel-glk-support.patch
+Patch3:           powertop-2.9-intel-cnluy-support.patch
+Patch4:           powertop-2.9-intel-cpu-check-aperf.patch
+Patch5:           powertop-2.9-powertop-2.3-compat.patch
+BuildRequires:    gettext-devel, ncurses-devel, pciutils-devel, zlib-devel, libnl3-devel
+BuildRequires:    systemd
+BuildRequires:    gcc, gcc-c++
+Requires(post):   systemd, coreutils
+Requires(preun):  systemd
 Requires(postun): systemd
+Provides:         bundled(kernel-event-lib)
 
 %description
 PowerTOP is a tool that finds the software component(s) that make your
 computer use more power than necessary while it is idle.
 
 %prep
-%setup -q
+%setup -q -n %{name}-v%{version}
 %patch0 -p1 -b .always-create-params
-%patch1 -p1 -b .man-fix
-%patch2 -p1 -b .ondemand-check
-%patch3 -p1 -b .unlimit-fds
-%patch4 -p1 -b .fd-limit-err
-%patch5 -p1 -b .reg-net-params
-%patch6 -p1 -b .tunable-overflow-fix.patch
-%patch7 -p1 -b .msr-check
-%patch8 -p1 -b .auto-tune
-%patch9 -p1 -b .improve-reporting
-
-# remove left over object files
-find . -name "*.o" -exec rm {} \;
+# https://github.com/fenrus75/powertop/commit/f3f350f138912dc89abb37676f7e65fc6057ec53
+%patch1 -p1 -b .cstates-rewrite-fix
+# https://github.com/fenrus75/powertop/commit/523b15bd892f036bb6b777ad6c88f334f0980347
+%patch2 -p1 -b .intel-glk-support
+# https://github.com/fenrus75/powertop/commit/0d3a1cda2a95484fa41cc4c35294a4153b3a5e97
+%patch3 -p1 -b .intel-cnluy-support
+# sent upstream
+%patch4 -p1 -b .intel-cpu-check-aperf
+# compatibility patch keeping consistent behavior with powertop-2.3
+%patch5 -p1 -b .powertop-2.3-compat
 
 %build
 %configure
@@ -78,10 +65,7 @@ install -Dpm 644 %{SOURCE1} %{buildroot}%{_unitdir}/powertop.service
 %post
 %systemd_post powertop.service
 # Hack for powertop not to show warnings on first start
-touch %{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop}
-
-%clean
-rm -rf %{buildroot}
+touch %{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop} &> /dev/null || :
 
 %files -f %{name}.lang
 %defattr(-,root,root,-)
@@ -94,6 +78,25 @@ rm -rf %{buildroot}
 %{_unitdir}/powertop.service
 
 %changelog
+* Fri May  4 2018 Jaroslav Škarvada <jskarvad@redhat.com> - 2.9-1
+- New version
+  Resolves: rhbz#1515645
+- Added support for Intel CNL-U/Y
+  Resolves: rhbz#1464918
+
+* Tue Mar 21 2017 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-12
+- Fixed auto-tuning
+  Resolves: rhbz#1392438
+
+* Mon Jul  4 2016 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-11
+- Added missing short options to manual page
+  Related: rhbz#1333495
+
+* Wed May 11 2016 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-10
+- Reintroduced -d, --dump option and added plain report mode,
+  fixed parameters and manual page
+  Resolves: rhbz#1333495
+
 * Mon May 11 2015 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-9
 - MSR read errors are no more fatal (by msr-check patch)
   Resolves: rhbz#1102088

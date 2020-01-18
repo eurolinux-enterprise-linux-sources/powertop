@@ -1,3 +1,5 @@
+#ifndef PowerTop_INTEL_CPUS_H_84F09FB4F519470FA914AA9B02453221
+#define PowerTop_INTEL_CPUS_H_84F09FB4F519470FA914AA9B02453221
 /*
  * Copyright 2010, Intel Corporation
  *
@@ -24,6 +26,7 @@
  */
 #include <stdint.h>
 #include <sys/time.h>
+#include <dirent.h>
 
 #include "cpu.h"
 
@@ -37,23 +40,46 @@
 #define MSR_PKG_C3_RESIDENCY		0x3F8
 #define MSR_PKG_C6_RESIDENCY		0x3F9
 #define MSR_PKG_C7_RESIDENCY		0x3FA
+#define MSR_PKG_C8_RESIDENCY		0x630
+#define MSR_PKG_C9_RESIDENCY		0x631
+#define MSR_PKG_C10_RESIDENCY		0x632
+#define MSR_CORE_C1_RESIDENCY		0x660
 #define MSR_CORE_C3_RESIDENCY		0x3FC
 #define MSR_CORE_C6_RESIDENCY		0x3FD
 #define MSR_CORE_C7_RESIDENCY		0x3FE
 
+class intel_util
+{
+protected:
+	int byt_ahci_support;
+        DIR *dir;
+public:
+	intel_util();
+	virtual void byt_has_ahci();
+	virtual int get_byt_ahci_support();
+};
 
-class nhm_package: public cpu_package
+class nhm_package: public cpu_package, public intel_util
 {
 private:
 	uint64_t	c2_before, c2_after;
 	uint64_t	c3_before, c3_after;
 	uint64_t	c6_before, c6_after;
 	uint64_t	c7_before, c7_after;
+	uint64_t	c8_before, c8_after;
+	uint64_t	c9_before, c9_after;
+	uint64_t	c10_before, c10_after;
 	uint64_t	tsc_before, tsc_after;
 
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
 public:
+	int		has_c7_res;
+	int		has_c2c6_res;
+	int		has_c3_res;
+	int		has_c6c_res;		/* BSW */
+	int		has_c8c9c10_res;
+	nhm_package(int model);
 	virtual void	measurement_start(void);
 	virtual void	measurement_end(void);
 	virtual int     can_collapse(void) { return 0;};
@@ -61,9 +87,10 @@ public:
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
 };
 
-class nhm_core: public cpu_core
+class nhm_core: public cpu_core, public intel_util
 {
 private:
+	uint64_t	c1_before, c1_after;
 	uint64_t	c3_before, c3_after;
 	uint64_t	c6_before, c6_after;
 	uint64_t	c7_before, c7_after;
@@ -72,6 +99,10 @@ private:
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
 public:
+	int		has_c1_res;
+	int		has_c7_res;
+	int		has_c3_res;
+	nhm_core(int model);
 	virtual void	measurement_start(void);
 	virtual void	measurement_end(void);
 	virtual int     can_collapse(void) { return 0;};
@@ -79,7 +110,7 @@ public:
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
 };
 
-class nhm_cpu: public cpu_linux
+class nhm_cpu: public cpu_linux, public intel_util
 {
 private:
 	uint64_t	aperf_before;
@@ -117,15 +148,13 @@ public:
 };
 
 
-extern int has_c2c7_res;
-
 class i965_core: public cpu_core
 {
 private:
 	uint64_t	rc6_before, rc6_after;
 	uint64_t	rc6p_before, rc6p_after;
 	uint64_t	rc6pp_before, rc6pp_after;
-	
+
 	struct timeval	before;
 	struct timeval	after;
 
@@ -142,3 +171,10 @@ public:
 	virtual void	wiggle(void) { };
 
 };
+
+int is_supported_intel_cpu(int model);
+int byt_has_ahci();
+
+int is_intel_pstate_driver_loaded();
+
+#endif

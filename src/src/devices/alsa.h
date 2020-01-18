@@ -30,18 +30,19 @@
 #include "../parameters/parameters.h"
 
 #include <stdint.h>
+#include <limits.h>
 
 class alsa: public device {
 	uint64_t start_active, end_active;
 	uint64_t start_inactive, end_inactive;
-	char sysfs_path[4096];
+	char sysfs_path[PATH_MAX];
 	char name[4096];
 	char humanname[4096];
 	char temp_buf[4096];
 	int rindex;
 public:
 
-	alsa(char *_name, char *path);
+	alsa(const char *_name, const char *path);
 
 	virtual void start_measurement(void);
 	virtual void end_measurement(void);

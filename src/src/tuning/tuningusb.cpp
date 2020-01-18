@@ -28,23 +28,22 @@
 #include "unistd.h"
 #include "tuningusb.h"
 #include <string.h>
+#include <dirent.h>
 #include <utility>
 #include <iostream>
 #include <fstream>
-#include <unistd.h>
-#include <sys/types.h>
-#include <dirent.h>
+#include <limits.h>
 
 #include "../lib.h"
 
 usb_tunable::usb_tunable(const char *path, const char *name) : tunable("", 0.9, _("Good"), _("Bad"), _("Unknown"))
 {
 	ifstream file;
-	char filename[4096];
+	char filename[PATH_MAX];
 	char vendor[2048];
 	char product[2048];
 	string str1, str2;
-	sprintf(usb_path, "%s/power/control", path);
+	snprintf(usb_path, sizeof(usb_path), "%s/power/control", path);
 
 	vendor[0] = 0;
 	product[0] = 0;
@@ -52,9 +51,9 @@ usb_tunable::usb_tunable(const char *path, const char *name) : tunable("", 0.9, 
 	str1 = read_sysfs_string("%s/idVendor", path);
 	str2 = read_sysfs_string("%s/idProduct", path);
 
-	sprintf(desc, _("Autosuspend for unknown USB device %s (%s:%s)"), name, str1.c_str(), str2.c_str());
+	snprintf(desc, sizeof(desc), _("Autosuspend for unknown USB device %s (%s:%s)"), name, str1.c_str(), str2.c_str());
 
-	sprintf(filename, "%s/manufacturer", path);
+	snprintf(filename, sizeof(filename), "%s/manufacturer", path);
 	file.open(filename, ios::in);
 	if (file) {
 		file.getline(vendor, 2047);
@@ -62,21 +61,21 @@ usb_tunable::usb_tunable(const char *path, const char *name) : tunable("", 0.9, 
 			vendor[0] = 0;
 		file.close();
 	};
-	sprintf(filename, "%s/product", path);
+	snprintf(filename, sizeof(filename), "%s/product", path);
 	file.open(filename, ios::in);
 	if (file) {
 		file.getline(product, 2040);
 		file.close();
 	};
 	if (strlen(vendor) && strlen(product))
-		sprintf(desc, _("Autosuspend for USB device %s [%s]"), product, vendor);
+		snprintf(desc, sizeof(desc), _("Autosuspend for USB device %s [%s]"), product, vendor);
 	else if (strlen(product))
-		sprintf(desc, _("Autosuspend for USB device %s [%s]"), product, name);
+		snprintf(desc, sizeof(desc), _("Autosuspend for USB device %s [%s]"), product, name);
 	else if (strlen(vendor))
-		sprintf(desc, _("Autosuspend for USB device %s [%s]"), vendor, name);
+		snprintf(desc, sizeof(desc), _("Autosuspend for USB device %s [%s]"), vendor, name);
 
-	sprintf(toggle_good, "echo 'auto' > '%s';", usb_path);
-	sprintf(toggle_bad, "echo 'on' > '%s';", usb_path);
+	snprintf(toggle_good, sizeof(toggle_good), "echo 'auto' > '%s';", usb_path);
+	snprintf(toggle_bad, sizeof(toggle_bad), "echo 'on' > '%s';", usb_path);
 }
 
 int usb_tunable::good_bad(void)
@@ -116,40 +115,43 @@ const char *usb_tunable::toggle_script(void)
 	return toggle_good;
 }
 
+static void add_usb_callback(const char *d_name)
+{
+	class usb_tunable *usb;
+	char filename[PATH_MAX];
+	DIR *dir;
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/power/control", d_name);
+	if (access(filename, R_OK) != 0)
+		return;
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/power/active_duration", d_name);
+	if (access(filename, R_OK)!=0)
+		return;
+
+	/* every interface of this device should support autosuspend */
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s", d_name);
+	if ((dir = opendir(filename))) {
+		struct dirent *entry;
+		while ((entry = readdir(dir))) {
+			/* dirname: <busnum>-<devnum>...:<config num>-<interface num> */
+			if (!isdigit(entry->d_name[0]))
+				continue;
+			snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s/%s/supports_autosuspend", d_name, entry->d_name);
+			if (access(filename, R_OK) == 0 && read_sysfs(filename) == 0)
+				break;
+		}
+		closedir(dir);
+		if (entry)
+			return;
+	}
+
+	snprintf(filename, sizeof(filename), "/sys/bus/usb/devices/%s", d_name);
+	usb = new class usb_tunable(filename, d_name);
+	all_tunables.push_back(usb);
+}
+
 void add_usb_tunables(void)
 {
-	struct dirent *entry;
-	DIR *dir;
-	char filename[4096];
-
-	dir = opendir("/sys/bus/usb/devices/");
-	if (!dir)
-		return;
-	while (1) {
-		class usb_tunable *usb;
-
-		entry = readdir(dir);
-
-		if (!entry)
-			break;
-		if (entry->d_name[0] == '.')
-			continue;
-
-		sprintf(filename, "/sys/bus/usb/devices/%s/power/control", entry->d_name);
-
-		if (access(filename, R_OK) != 0)
-			continue;
-
-		sprintf(filename, "/sys/bus/usb/devices/%s/power/active_duration", entry->d_name);
-		if (access(filename, R_OK)!=0)
-			continue;
-
-		sprintf(filename, "/sys/bus/usb/devices/%s", entry->d_name);
-
-		usb = new class usb_tunable(filename, entry->d_name);
-
-		all_tunables.push_back(usb);
-
-	}
-	closedir(dir);
+	process_directory("/sys/bus/usb/devices/", add_usb_callback);
 }

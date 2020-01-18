@@ -1,6 +1,19 @@
 AUTOMAKE_OPTIONS = subdir-objects
-ACLOCAL_AMFLAGS = -I m4
+ACLOCAL_AMFLAGS = --install -I m4
 
-SUBDIRS = traceevent src po doc
+SUBDIRS = \
+	traceevent \
+	src \
+	po \
+	doc
 
-EXTRA_DIST = README TODO Android.mk COPYING autogen.sh 
+EXTRA_DIST = \
+	config.rpath \
+	m4/ChangeLog  \
+	README \
+	TODO \
+	Android.mk \
+	COPYING \
+	version-long \
+	version-short \
+	autogen.sh

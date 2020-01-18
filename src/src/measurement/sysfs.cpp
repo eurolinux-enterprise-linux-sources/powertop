@@ -27,17 +27,18 @@
 #include "../lib.h"
 #include <string.h>
 #include <stdio.h>
+#include <limits.h>
 
 sysfs_power_meter::sysfs_power_meter(const char *power_supply_name)
 {
 	rate = 0.0;
 	capacity = 0.0;
-	strncpy(name, power_supply_name, sizeof(name));
+	pt_strcpy(name, power_supply_name);
 }
 
 bool sysfs_power_meter::get_sysfs_attr(const char *attribute, int *value)
 {
-	char filename[4096];
+	char filename[PATH_MAX];
 	bool ok;
 
 	snprintf(filename, sizeof(filename), "/sys/class/power_supply/%s/%s", name, attribute);
@@ -126,11 +127,13 @@ void sysfs_power_meter::measure()
 
 	rate = 0.0;
 	capacity = 0.0;
+	this->set_discharging(false);
 
 	if (!is_present())
 		return;
-	if (read_sysfs_string("/sys/class/power_supply/%s/status", name) != "Discharging")
-		return;
+	/** do not jump over. we may have discharging battery */
+	if (read_sysfs_string("/sys/class/power_supply/%s/status", name) == "Discharging")
+		this->set_discharging(true);
 
 	got_rate = set_rate_from_power();
 	got_capacity = set_capacity_from_energy();
@@ -145,7 +148,6 @@ void sysfs_power_meter::measure()
 			set_capacity_from_charge(voltage);
 	}
 }
-
 
 void sysfs_power_meter::end_measurement(void)
 {

@@ -25,19 +25,20 @@
 #ifndef _INCLUDE_GUARD_BACKLIGHT_H
 #define _INCLUDE_GUARD_BACKLIGHT_H
 
+#include <limits.h>
 
 #include "device.h"
 
 class backlight: public device {
 	int min_level, max_level;
 	int start_level, end_level;
-	char sysfs_path[4096];
+	char sysfs_path[PATH_MAX];
 	char name[4096];
 	int r_index;
 	int r_index_power;
 public:
 
-	backlight(char *_name, char *path);
+	backlight(const char *_name, const char *path);
 
 	virtual void start_measurement(void);
 	virtual void end_measurement(void);

@@ -35,6 +35,8 @@
 #include <string.h>
 #include <malloc.h>
 #include <unistd.h>
+#include <limits.h>
+#include "report-data-html.h"
 
 using namespace std;
 
@@ -99,78 +101,95 @@ static string read_os_release(const string &filename)
 
 static void system_info(void)
 {
-	string str, str2, str3;
+	string str;
+	char version_date[64];
+	time_t now = time(NULL);
 
-	report.begin_section(SECTION_SYSINFO);
-	report.add_header("System Information");
-	report.begin_table();
-	report.begin_row(ROW_SYSINFO);
-	report.begin_cell(CELL_SYSINFO);
-	report.add("PowerTOP Version");
-	report.begin_cell();
-	report.add(POWERTOP_VERSION);
+	/* div attr css_class and css_id */
+	tag_attr div_attr;
+	init_div(&div_attr, "sys_info", "");
+
+	/* Set Table attributes, rows, and cols */
+	table_attributes sys_table;
+	init_top_table_attr(&sys_table, 5, 2);
+
+	/* Set Title attributes */
+	tag_attr title_attr;
+        init_title_attr(&title_attr);
+
+	/* Set array of data in row Major order */
+	string *system_data = new string[sys_table.rows * sys_table.cols];
+	system_data[0]=__("PowerTOP Version");
+	snprintf(version_date, sizeof(version_date), "%s ran at %s", PACKAGE_VERSION, ctime(&now));
+	system_data[1]=version_date;
 
 	str = read_sysfs_string("/proc/version");
-	report.begin_row(ROW_SYSINFO);
-	report.begin_cell();
-	report.add("Kernel Version");
-	report.begin_cell();
-	report.add(str.c_str());
+	size_t  found = str.find(" ");
+	found = str.find(" ", found+1);
+	found = str.find(" ", found+1);
+	str = str.substr(0,found);
+	system_data[2]=__("Kernel Version");
+	system_data[3]=str.c_str();
 
 	str  = read_sysfs_string("/sys/devices/virtual/dmi/id/board_vendor");
-	str2 = read_sysfs_string("/sys/devices/virtual/dmi/id/board_name");
-	str3 = read_sysfs_string("/sys/devices/virtual/dmi/id/product_version");
-	report.begin_row(ROW_SYSINFO);
-	report.begin_cell();
-	report.add("System Name");
-	report.begin_cell();
-	report.addf("%s %s %s", str.c_str(), str2.c_str(), str3.c_str());
-
+	system_data[4]=__("System Name");
+	system_data[5]= str.c_str();
+	str = read_sysfs_string("/sys/devices/virtual/dmi/id/board_name");
+	system_data[5].append(str.c_str());
+	str = read_sysfs_string("/sys/devices/virtual/dmi/id/product_version");
+	system_data[5].append(str.c_str());
 	str = cpu_model();
-	report.begin_row(ROW_SYSINFO);
-	report.begin_cell();
-	report.add("CPU Information");
-	report.begin_cell();
-	report.addf("%lix %s", sysconf(_SC_NPROCESSORS_ONLN), str.c_str());
+	system_data[6]=__("CPU Information");
+	stringstream n_proc;
+	n_proc << sysconf(_SC_NPROCESSORS_ONLN);
+	system_data[7]= n_proc.str();
+	system_data[7].append(str.c_str());
 
 	str = read_sysfs_string("/etc/system-release");
 	if (str.length() < 1)
-		str = read_sysfs_string("/etc/redhat-release");
+	str = read_sysfs_string("/etc/redhat-release");
 	if (str.length() < 1)
-		str = read_os_release("/etc/os-release");
+	str = read_os_release("/etc/os-release");
 
-	report.begin_row(ROW_SYSINFO);
-	report.begin_cell();
-	report.add("OS Information");
-	report.begin_cell();
-	report.add(str.c_str());
+	system_data[8]=__("OS Information");
+	system_data[9]=str;
+
+	/* Report Output */
+	report.add_header();
+	report.add_logo();
+	report.add_div(&div_attr);
+	report.add_title(&title_attr, __("System Information"));
+	report.add_table(system_data, &sys_table);
+	report.end_header();
+	report.end_div();
+	report.add_navigation();
+	delete [] system_data;
 }
 
 void init_report_output(char *filename_str, int iterations)
 {
 	size_t period;
-	char file_prefix[4096];
-	char file_postfix[8];
+	string filename;
 	time_t stamp;
 	char datestr[200];
 
-	string mystring = string(filename_str);
-	sprintf(file_postfix, "%s",
-		(reporttype == REPORT_HTML ? "html" : "csv"));
-	period=mystring.find_last_of(".");
-	sprintf(file_prefix, "%s",mystring.substr(0,period).c_str());
-	memset(&datestr, 0, 200);
-	memset(&stamp, 0, sizeof(time_t));
-	stamp=time(NULL);
-	strftime(datestr, sizeof(datestr), "%Y%m%d-%H%M%S", localtime(&stamp));
-
-	if (iterations != 1)
-		sprintf(reportout.filename, "%s-%s.%s",
-			file_prefix, datestr,file_postfix);
+	if (iterations == 1)
+		snprintf(reportout.filename, sizeof(reportout.filename), "%s", filename_str);
 	else
-		sprintf(reportout.filename, "%s.%s",
-			file_prefix, file_postfix);
-
+	{
+		filename = string(filename_str);
+		period = filename.find_last_of(".");
+		if (period > filename.length())
+			period = filename.length();
+		memset(&datestr, 0, 200);
+		memset(&stamp, 0, sizeof(time_t));
+		stamp = time(NULL);
+		strftime(datestr, sizeof(datestr), "%Y%m%d-%H%M%S", localtime(&stamp));
+		snprintf(reportout.filename, sizeof(reportout.filename), "%s-%s%s",
+			filename.substr(0, period).c_str(), datestr,
+			filename.substr(period).c_str());
+	}
+	
 	reportout.report_file = fopen(reportout.filename, "wm");
 	if (!reportout.report_file) {
 		fprintf(stderr, _("Cannot open output file %s (%s)\n"),

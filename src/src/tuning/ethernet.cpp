@@ -25,6 +25,7 @@
 
 #include "tuning.h"
 #include "tunable.h"
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,12 +33,8 @@
 #include <utility>
 #include <iostream>
 #include <fstream>
-#include <unistd.h>
-#include <dirent.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <dirent.h>
 #include <linux/types.h>
 #include <net/if.h>
 #include <linux/sockios.h>
@@ -53,9 +50,9 @@ extern void create_all_nics(callback fn);
 ethernet_tunable::ethernet_tunable(const char *iface) : tunable("", 0.3, _("Good"), _("Bad"), _("Unknown"))
 {
 	memset(interf, 0, sizeof(interf));
-	strncpy(interf, iface, sizeof(interf));
+	pt_strcpy(interf, iface);
 	sprintf(desc, _("Wake-on-lan status for device %s"), iface);
-	sprintf(toggle_good, "ethtool -s %s wol d;", iface);
+	snprintf(toggle_good, sizeof(toggle_good), "ethtool -s %s wol d;", iface);
 
 }
 
@@ -74,7 +71,7 @@ int ethernet_tunable::good_bad(void)
 	if (sock<0)
 		return result;
 
-	strcpy(ifr.ifr_name, interf);
+	pt_strcpy(ifr.ifr_name, interf);
 
 	/* Check if the interf is up */
 	ret = ioctl(sock, SIOCGIFFLAGS, &ifr);
@@ -110,7 +107,7 @@ void ethernet_tunable::toggle(void)
 	if (sock<0)
 		return;
 
-	strcpy(ifr.ifr_name, interf);
+	pt_strcpy(ifr.ifr_name, interf);
 
 	/* Check if the interface is up */
 	ret = ioctl(sock, SIOCGIFFLAGS, &ifr);
@@ -146,7 +143,10 @@ const char *ethernet_tunable::toggle_script(void)
 
 void ethtunable_callback(const char *d_name)
 {
-	class ethernet_tunable *eth = new(std::nothrow) class ethernet_tunable(d_name);
+	class ethernet_tunable *eth;
+	if (strcmp(d_name, "lo") == 0)
+		return;
+	eth = new(std::nothrow) class ethernet_tunable(d_name);
 	if (eth)
 		all_tunables.push_back(eth);
 }

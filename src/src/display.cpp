@@ -117,7 +117,7 @@ void show_tab(unsigned int tab)
 
 	wattrset(tab_bar, A_REVERSE);
 	mvwprintw(tab_bar, 0,0, "%120s", "");
-	mvwprintw(tab_bar, 0,0, "PowerTOP %s", POWERTOP_SHORT_VERSION);
+	mvwprintw(tab_bar, 0,0, "PowerTOP %s", PACKAGE_SHORT_VERSION);
 
 	bottom_line = newwin(1, 0, LINES-1, 0);
 	wattrset(bottom_line, A_REVERSE);
@@ -127,7 +127,9 @@ void show_tab(unsigned int tab)
 	if (c && strlen(c) > 0)
 		mvwprintw(bottom_line, 0,0, c);
 	else
-		mvwprintw(bottom_line, 0,0,"<ESC> %s | ",_("Exit"));
+		mvwprintw(bottom_line, 0, 0,
+			"<ESC> %s | <TAB> / <Shift + TAB> %s | ", _("Exit"),
+			_("Navigate"));
 
 
 	current_tab = tab;
@@ -267,13 +269,8 @@ void cursor_up(void)
 	if (w) {
 		w->cursor_up(); 
 		if(w->ypad_pos > 0) {
-			if (tab_names[current_tab] == "Tunables") {
-				prefresh(w->win, --w->ypad_pos, w->xpad_pos, 
-					1, 0, LINES - 3, COLS - 1);
-	                } else {
-				prefresh(w->win, --w->ypad_pos, w->xpad_pos, 
-					1, 0, LINES - 3, COLS - 1);
-			}
+			prefresh(w->win, --w->ypad_pos, w->xpad_pos,
+				 1, 0, LINES - 3, COLS - 1);
 		}
 	}
 	
