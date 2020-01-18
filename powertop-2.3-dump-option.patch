@@ -1,4 +1,5 @@
 diff --git a/doc/powertop.8 b/doc/powertop.8
+index 0f460ec..9d225ca 100644
 --- a/doc/powertop.8
 +++ b/doc/powertop.8
 @@ -25,40 +25,44 @@ can get more accurate estimates by using this option to enable a
@@ -61,6 +62,7 @@ diff --git a/doc/powertop.8 b/doc/powertop.8
  .SH BUGS
  Send bug reports to <powertop@lists.01.org>
 diff --git a/src/Makefile.am b/src/Makefile.am
+index 398b8a7..5807a2d 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -31,6 +31,7 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
@@ -72,6 +74,7 @@ diff --git a/src/Makefile.am b/src/Makefile.am
  
  
 diff --git a/src/Makefile.in b/src/Makefile.in
+index fde9aed..591e675 100644
 --- a/src/Makefile.in
 +++ b/src/Makefile.in
 @@ -120,6 +120,7 @@ am_powertop_OBJECTS = parameters/powertop-persistent.$(OBJEXT) \
@@ -137,6 +140,7 @@ diff --git a/src/Makefile.in b/src/Makefile.in
  @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(powertop_CPPFLAGS) $(CPPFLAGS) $(powertop_CXXFLAGS) $(CXXFLAGS) -MT powertop-main.o -MD -MP -MF $(DEPDIR)/powertop-main.Tpo -c -o powertop-main.o `test -f 'main.cpp' || echo '$(srcdir)/'`main.cpp
  @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/powertop-main.Tpo $(DEPDIR)/powertop-main.Po
 diff --git a/src/main.cpp b/src/main.cpp
+index 7ead705..339cfd1 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -68,17 +68,24 @@ int debug_learning = 0;
@@ -212,6 +216,15 @@ diff --git a/src/main.cpp b/src/main.cpp
 +			case OPT_EXTECH: /* Extech power analyzer support */
  				checkroot();
  				extech_power_meter(optarg ? optarg : "/dev/ttyUSB0");
+ 				break;
+@@ -392,7 +403,7 @@ int main(int argc, char **argv)
+ 				print_usage();
+ 				exit(0);
+ 				break;
+-			case 'a':
++			case OPT_AUTO_TUNE:
+ 				auto_tune = 1;
+ 				leave_powertop = 1;
  				break;
 @@ -401,7 +412,8 @@ int main(int argc, char **argv)
  				calibrate();
@@ -483,6 +496,7 @@ new file mode 100644
 +
 +#endif /* _REPORT_FORMATTER_PLAIN_H_ */
 diff --git a/src/report/report-maker.cpp b/src/report/report-maker.cpp
+index 59e83d9..7b7ac05 100644
 --- a/src/report/report-maker.cpp
 +++ b/src/report/report-maker.cpp
 @@ -32,6 +32,7 @@
@@ -503,6 +517,7 @@ diff --git a/src/report/report-maker.cpp b/src/report/report-maker.cpp
  		formatter = new report_formatter();
  	else
 diff --git a/src/report/report-maker.h b/src/report/report-maker.h
+index 75e0d06..a589cd8 100644
 --- a/src/report/report-maker.h
 +++ b/src/report/report-maker.h
 @@ -76,7 +76,7 @@
@@ -525,6 +540,7 @@ diff --git a/src/report/report-maker.h b/src/report/report-maker.h
  
  /* ************************************************************************ */
 diff --git a/src/report/report.cpp b/src/report/report.cpp
+index b01b925..b1444b3 100644
 --- a/src/report/report.cpp
 +++ b/src/report/report.cpp
 @@ -152,28 +152,35 @@ void init_report_output(char *filename_str, int iterations)
@@ -599,4 +615,3 @@ diff --git a/src/report/report.cpp b/src/report/report.cpp
  	}
  	report.clear_result();
  }
-

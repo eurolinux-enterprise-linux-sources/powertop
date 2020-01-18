@@ -1,6 +1,6 @@
 Name:           powertop
 Version:        2.3
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Power consumption monitor
 
 Group:          Applications/System
@@ -101,6 +101,10 @@ rm -rf %{buildroot}
 %{_unitdir}/powertop.service
 
 %changelog
+* Tue Mar 21 2017 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-12
+- Fixed auto-tuning
+  Resolves: rhbz#1392438
+
 * Mon Jul  4 2016 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-11
 - Added missing short options to manual page
   Related: rhbz#1333495
