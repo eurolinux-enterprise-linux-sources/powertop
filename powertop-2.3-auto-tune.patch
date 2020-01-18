@@ -1,0 +1,121 @@
+diff --git a/doc/powertop.8 b/doc/powertop.8
+index 4a2f0b0..0f460ec 100644
+--- a/doc/powertop.8
++++ b/doc/powertop.8
+@@ -14,7 +14,10 @@ experiment with various power management settings. When invoking powertop
+ without arguments powertop starts in interactive mode.
+ .SH OPTIONS
+ .TP
+-\fB\-\-calibrate
++.B \-\-auto\-tune
++Set all tunable options to their good setting without interaction.
++.TP
++.BR \-c ", " \-\-calibrate
+ runs powertop in calibration mode. When running on battery, powertop
+ can track power consumption as well as system activity. When there
+ are enough measurements, powertop can start to report power estimates. One
+diff --git a/src/main.cpp b/src/main.cpp
+index 16b1613..9da3167 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -75,6 +75,7 @@ static const struct option long_options[] =
+ 	{"version", no_argument, NULL, 'V'},
+ 	{"help",no_argument, NULL, 'u'}, /* u for usage */
+ 	{"calibrate",no_argument, NULL, 'c'},
++	{"auto-tune",no_argument, NULL, 'a'},
+ 	{"html", optional_argument, NULL, 'h'},
+ 	{"csv", optional_argument, NULL, 'C'},
+ 	{"extech", optional_argument, NULL, 'e'},
+@@ -110,6 +111,7 @@ static void print_usage()
+ 	printf("--debug \t\t %s\n",_("run in \"debug\" mode"));
+ 	printf("--version \t\t %s\n",_("print version information"));
+ 	printf("--calibrate \t\t %s\n",_("runs powertop in calibration mode"));
++	printf("--auto-tune \t\t %s\n",_("Sets all tunable options to their GOOD setting"));
+ 	printf("--extech%s \t %s\n",_("[=devnode]"),_("uses an Extech Power Analyzer for measurements"));
+ 	printf("--html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
+ 	printf("--csv%s \t %s\n",_("[=FILENAME]"),_("generate a csv report"));
+@@ -362,7 +364,7 @@ int main(int argc, char **argv)
+ 	int c;
+ 	char filename[4096];
+ 	char workload[4096] = {0,};
+-	int  iterations = 1;
++	int  iterations = 1, auto_tune = 0;
+ 
+ 	set_new_handler(out_of_memory);
+ 
+@@ -390,7 +392,10 @@ int main(int argc, char **argv)
+ 				print_usage();
+ 				exit(0);
+ 				break;
+-
++			case 'a':
++				auto_tune = 1;
++				leave_powertop = 1;
++				break;
+ 			case 'c':
+ 				powertop_init();
+ 				calibrate();
+@@ -446,20 +451,27 @@ int main(int argc, char **argv)
+ 		end_pci_access();
+ 		exit(0);
+ 	}
+-
++	if (!auto_tune)
++		init_display();
++	initialize_tuning();
+ 	/* first one is short to not let the user wait too long */
+-	init_display();
+ 	one_measurement(1, NULL);
+-	initialize_tuning();
+-	tuning_update_display();
+-	show_tab(0);
++
++	if (!auto_tune) {
++		tuning_update_display();
++		show_tab(0);
++	} else {
++		auto_toggle_tuning();
++	}
+ 
+ 	while (!leave_powertop) {
+-		show_cur_tab();
++		if (!auto_tune)
++			show_cur_tab();
+ 		one_measurement(time_out, NULL);
+ 		learn_parameters(15, 0);
+ 	}
+-	endwin();
++	if (!auto_tune)
++		endwin();
+ 	printf("%s\n", _("Leaving PowerTOP"));
+ 
+ 	end_process_data();
+diff --git a/src/tuning/tuning.cpp b/src/tuning/tuning.cpp
+index 08d8251..ff3d715 100644
+--- a/src/tuning/tuning.cpp
++++ b/src/tuning/tuning.cpp
+@@ -273,3 +273,11 @@ void clear_tuning()
+ 	}
+ 	all_untunables.clear();
+ }
++
++void auto_toggle_tuning()
++{
++	for (unsigned int i = 0; i < all_tunables.size(); i++) {
++		if (all_tunables[i]->good_bad() == TUNE_BAD)
++			all_tunables[i]->toggle();
++	}
++}
+diff --git a/src/tuning/tuning.h b/src/tuning/tuning.h
+index 7c4921f..f70001b 100644
+--- a/src/tuning/tuning.h
++++ b/src/tuning/tuning.h
+@@ -29,7 +29,5 @@ extern void initialize_tuning(void);
+ extern void tuning_update_display(void);
+ extern void report_show_tunables(void);
+ extern void clear_tuning(void);
+-
+-
+-
++extern void auto_toggle_tuning(void);
+ #endif

@@ -1,12 +1,13 @@
 Name:           powertop
 Version:        2.3
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Power consumption monitor
 
 Group:          Applications/System
 License:        GPLv2
 URL:            http://01.org/powertop/
 Source0:        http://01.org/powertop/sites/default/files/downloads/%{name}-%{version}.tar.gz
+Source1:        powertop.service
 
 # Sent upstream
 Patch0:         powertop-2.3-always-create-params.patch
@@ -21,9 +22,18 @@ Patch4:         powertop-2.3-fd-limit-err.patch
 # Sent upstream
 Patch5:         powertop-2.3-reg-net-params.patch
 Patch6:         powertop-2.3-tunable-overflow-fix.patch
+# Reported upstream, but upstream powertop needs different patch
+Patch7:         powertop-2.3-msr-check.patch
+# Backported from upstream
+Patch8:         powertop-2.3-auto-tune.patch
+# Sent upstream
+Patch9:         powertop-2.3-improve-reporting.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  gettext, ncurses-devel, pciutils-devel, zlib-devel, libnl3-devel
-Requires(post): coreutils
+BuildRequires:  systemd
+Requires(post): systemd, coreutils
+Requires(preun): systemd
+Requires(postun): systemd
 
 %description
 PowerTOP is a tool that finds the software component(s) that make your
@@ -38,6 +48,9 @@ computer use more power than necessary while it is idle.
 %patch4 -p1 -b .fd-limit-err
 %patch5 -p1 -b .reg-net-params
 %patch6 -p1 -b .tunable-overflow-fix.patch
+%patch7 -p1 -b .msr-check
+%patch8 -p1 -b .auto-tune
+%patch9 -p1 -b .improve-reporting
 
 # remove left over object files
 find . -name "*.o" -exec rm {} \;
@@ -53,7 +66,17 @@ install -Dd %{buildroot}%{_localstatedir}/cache/powertop
 touch %{buildroot}%{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop}
 %find_lang %{name}
 
+# Systemd
+install -Dpm 644 %{SOURCE1} %{buildroot}%{_unitdir}/powertop.service
+
+%preun
+%systemd_preun powertop.service
+
+%postun
+%systemd_postun_with_restart powertop.service
+
 %post
+%systemd_post powertop.service
 # Hack for powertop not to show warnings on first start
 touch %{_localstatedir}/cache/powertop/{saved_parameters.powertop,saved_results.powertop}
 
@@ -68,8 +91,18 @@ rm -rf %{buildroot}
 %ghost %{_localstatedir}/cache/powertop/saved_results.powertop
 %{_sbindir}/powertop
 %{_mandir}/man8/powertop.8*
+%{_unitdir}/powertop.service
 
 %changelog
+* Mon May 11 2015 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-9
+- MSR read errors are no more fatal (by msr-check patch)
+  Resolves: rhbz#1102088
+- Backported --auto-tune feature and added one-shot systemd service
+  (by auto-tune patch)
+  Resolves: rhbz#1143014
+- Improved handling of reporting filenames (by improve-reporting patch)
+  Resolves: rhbz#1039822
+
 * Tue Mar 25 2014 Jaroslav Škarvada <jskarvad@redhat.com> - 2.3-8
 - Fixed buffer overflow in cpufreq tunables on systems with many CPUs
   (by tunable-overflow-fix patch)
